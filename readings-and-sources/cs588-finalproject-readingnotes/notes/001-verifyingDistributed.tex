@@ -1,0 +1,234 @@
+\documentclass[../cs588-projectReadings-master.tex]{subfiles}
+
+\begin{document}
+
+\large{}
+Reading 001: ``Verifying Distributed Erasure-Coded Data''
+\normalsize
+
+\begin{hangparas}{0.5in}{1}
+    \textbf{J. Hendricks, G. Ganger, \& M. K. Reiter. ``Verifying distributed erasure-coded data,'' in \textit{Proceedings of the 26th Annual ACM Symposium on Principles of Distributed Computing (PODC)}, R. Wattenhofer, Chair, Portland, OR, USA, Aug. 12-15, 2007, pp.  139-146. doi: 10.1145/1281100.1281122}
+\end{hangparas}
+\vspace{2em}
+
+\subsection*{\underline{Notes}}
+\begin{itemize}
+    \item ``An \textit{m-of-n} erasure code encodes a block of data into $n$ framents, each $1/m^{th}$ the size of the original block, such that any $m$ can be used to reconstruct the original block. Thus, $(n - m)$ of the fragments can be unavailable (e.g., due to corruption or server failure) without loss of access.''
+    \begin{itemize}
+        \item Concrete example: a 3-of-5 erasure code encodes a block of data into 5 fragments, each 1/3 the size of the original block, such that any 3 can be used to reconstruct the original block. Thus, 2 of the fragments can be unavailable without loss of access to the original data.
+        \item The difficulty with erasure codes: \textbf{\textit{any}} randomly chosen subset of $m$ fragments can be used to reconstruct the original block.
+        \vspace{0.25em}
+
+        \begin{enumerate}
+            \item Each fragment is much smaller than the original ($1/m$ the size)
+            \item Any $m$ fragments collectively contain all the information needed
+            \item Fewer than $m$ fragments are insufficient to reconstruct the data
+        \end{enumerate}
+    \end{itemize}
+    \vspace{1em}
+
+    \item ``Unfortunately, erasure coding creates a fundamental challenge: determining if a given fragment indeed corresponds to a specific original block. If this is not ensured for each fragment, then reconstructing from different subsets of fragments may result in different blocks, violating any reasonable definition of data consistency.''
+    \begin{itemize}
+        \item I hadn't even considered this \textendash{} but it makes sense. If the fragments are stored on different machines, an adversary could tamper with a fragment and introduce malicious data.
+        \item Solution introduced in this paper: fingerprints. My understanding at this point is that the fingerprint acts as a key of sorts, which can be used to verify the original data block when reconstructing from fragments.
+    \end{itemize}
+
+    \item Let $\mathbbm{F}_{q^k}[x]$ denote the set of polynomials with cofficients in $\mathbbm{F}_{q^k}$, with ``+'' and ``$\cdot$'' defined as in normal polynomial arrithmetic.
+    \begin{itemize}
+        \item Translation: $\mathbbm{F}_{q^k}[x]$ is the set of all polynomials of shape $c_n \cdot x^{n} + c_{n-1} \cdot x^{n-1} + \dots + c_{1} \cdot x^1 + c_0$, where $c_i \in \mathbbm{F}_{q^k}$ and $x$ represents the variables, and $q^k$ represents the size of the finite field $\mathbbm{F}_{q^k}$:
+        \begin{itemize}
+            \item $q$ is a prime number
+            \item $k$ is some positive integer
+            \item $q^k$ tells you how many elements are in $\mathbbm{F}_{q^k}$
+        \end{itemize}
+    \end{itemize}
+    \vspace{0.25em}
+    
+    \item A vector $d \in \mathbbm{F}_{q^k}^\delta$ of $\delta$ elements of $\mathbbm{F}_{q^k}$ has a natural representation as a polynomial $d(x) \in \mathbbm{F}_{q^k}[x]$ of degree less than $\delta$ with coefficients in $\mathbbm{F}_{q^k}$...
+    \begin{itemize}
+        \item $d$ = A vector of $\delta$ elements. If $\delta = 5$, then $d = (d_0, d_1, d_2, d_3, d_4)$, where each $d_i \in \mathbbm{F}_{q^k}$
+        \item $d(x)$ = A polynomial of degree less than $\delta$ (largest exponent is $\delta - 1$) with coefficients in $\mathbbm{F}_{q^k}$
+        \item $d(x) = d_0 + d_1 \cdot x + d_2 \cdot x^2 + \dots + d_{\delta - 1} \cdot x^{\delta - 1}$
+    \end{itemize}
+    \vspace{1em}
+
+    \item Let $\mathbbm{F}_2$ denote a field of order 2, let $K = \{ 2, 3, 4, \dots, 2^\gamma \}$,
+    \begin{itemize}
+        \item $\mathbbm{F}_2 = \{ 0, 1 \}$ - a binary field
+        \item $K$ = a set of integer labels, where $\gamma$ is a positive integer.
+    \end{itemize}
+    \vspace{1em}
+
+    \item Division fingerprinting:
+    \begin{itemize}
+        \item $\mathbbm{F}_{q^k}$ = a field of finite values of order (size) $q^k$
+        \item $|K|$ = the number of monic irreducible polynomials of prime degree $\gamma$ with coefficients in $\mathbbm{F}_{q^k}$
+        \begin{itemize}
+            \item ``monic'' = the leading coefficient is 1
+            \item ``irreducible'' = cannot be factored into the product of two non-constant polynomials with coefficients in $\mathbbm{F}_{q^k}$
+            \item ``prime degree'' = the degree of the polynomial is a prime number (e.g., 2, 3, 5, 7, etc.)
+            \item Note on $\gamma$ and max degree: The degree of the polynomial is at most $\gamma - 1$
+            \item Example: For $\mathbbm{F}_2$, $\gamma = 3$: $x^2 + x + 1$
+        \end{itemize}
+        \item $P_{q^k} : K \rightarrow \mathbbm{F}_{q^k}[x]$ = a deterministic algorith that outputs monic irreducible polynomials of prime degree $\gamma$ with coefficients in $\mathbbm{F}_{q^k}$ chosen uniformly at random from $K$, with probabilities taken over the choice of input $r \in K$ uniformly at random
+        \begin{itemize}
+            \item A function that maps each element of $K$ to a polynomial in $\mathbbm{F}_{q^k}[x]$
+            \item The probability of a coefficient's value is determined by the choice of $r$ uniformly at random from $K$
+            \item The function is deterministic, meaning that for a given input $r$, it will always produce the same output polynomial. However, since $r$ is chosen uniformly at random from $K$, the output polynomial can be considered random when viewed over the randomness of $r$.
+        \end{itemize}
+        \item $fp(r, d) : K \times \displaystyle \mathbbm{F}_{q^k}^\delta \rightarrow \mathbbm{F}_{q^k}^\gamma$
+        \begin{itemize}
+            \item $r$ = an element of $K$ (a random seed)
+            \item $d$ = a vector of $\delta$ elements of $\mathbbm{F}_{q^k}$, which can be represented as a polynomial $d(x)$
+            \vspace{0.5em}
+            $$
+                \begin{aligned}
+                    fp(r, d(x)) &: p(x) \leftarrow P_{q^k}(r); \\
+                    &\text{return }(d(x) \mod p(x)) \\
+                \end{aligned}
+            $$
+            \vspace{0.5em}
+            \item $d(x)$ = the polynomial representation of the data vector $d$
+            \item $p(x)$ = a monic irreducible polynomial of prime degree $\gamma$ with coefficients in $\mathbbm{F}_{q^k}$, determined by the input $r$ through the function $P_{q^k}$
+            \item $fp(r, d)$ = the fingerprint of $d$ with respect to the random seed $r$, computed as the remainder of $d(x)$ divided by $p(x)$
+        \end{itemize}
+        \vspace{1em}
+
+        \item Chance of collision:
+        $$
+            \begin{aligned}
+                \varepsilon &= \frac{\delta}{q^{k\gamma} - q^{\frac{k\gamma}{2}}} \\
+                &\approx \frac{\delta}{q^{k\gamma}} \text{ for sufficiently large } \gamma \\
+            \end{aligned}
+        $$
+    \end{itemize}
+    \vspace{1.5em}
+
+    \item Evaluation fingerprinting:
+    \begin{itemize}
+        \item $\mathbbm{E}_{q^{k\gamma}} = \displaystyle \frac{\mathbbm{F}_{q^k}[x]}{p(x)}$
+        \begin{itemize}
+            \item A field of polynomials with coefficients in $\mathbbm{F}_{q^k}$ of degree less than $\gamma$, with ``$\cdot$'' defined modulo $p(x)$
+            \item $p(x)$ = a constant monic degree-$\gamma$ irreducible polynomical with coefficients in $\mathbbm{F}_{q^k}$
+        \end{itemize}
+
+        \item $K = \{ 0, \dots, q^{k\gamma} - 1 \}$
+        \begin{itemize}
+            \item The set of integer labels, where $\gamma$ is a positive integer and $q^{k\gamma}$ is the size of the field $\mathbbm{E}_{q^{k\gamma}}$
+        \end{itemize}
+        
+        \item $S : K \rightarrow \mathbbm{E}_{q^{k\gamma}}$
+        \begin{itemize}
+            \item A deterministic algorhtm that outputs an element belonging to $\mathbbm{E}_{q^{k\gamma}}$ chosen uniformly at random, with probabilities taken over the choice of input $r \in K$ uniformly at random
+            \item A mapping of each element of $K$ to a polynomial in $\mathbbm{E}_{q^{k\gamma}}$
+        \end{itemize}
+
+        \item $fp(r, d) : K \times \mathbbm{F}_{q^k}^\delta \rightarrow \mathbbm{F}_{q^k}^\gamma$
+        \begin{itemize}
+            \item $\delta$ = the number of elements in the data vector $d$
+            \item $\gamma$ = the number of elements in the fingerprint vector $fp(r, d)$
+            \item $r$ = an element of $K$ (a random seed)
+            \vspace{0.5em}
+
+            $$
+                \begin{aligned}
+                    fp(r, d(y, x)) : &s(x) \leftarrow S(r); \\
+                    &\text{return } d(s(x), x) \\ 
+                \end{aligned}
+            $$
+            \vspace{0.5em}
+
+            \item $d(y, x)$ = the bivariate polynomial representation of the data vector $d$
+            \item $s(x)$ = an element of $\mathbbm{E}_{q^{k\gamma}}$ determined by the input $r$ through the function $S$
+            \item $fp(r, d)$ = the fingerprint of $d$ with respect to the random seed $r$, computed as the evaluation of the bivariate polynomial $d(y, x)$ at $y = s(x)$
+            \item $d(s(x), x)$ = the fingerprint; returns a univariate polynomial in $x$ of degree less than $\gamma$, which can be represented as a vector of $\gamma$ elements of $\mathbbm{F}_{q^k}$
+        \end{itemize}
+        \vspace{1em}
+        \item Chance of collision:
+        $$
+            \begin{aligned}
+                \varepsilon &= \frac{\delta / \gamma}{q^{k\gamma}} \\
+            \end{aligned}
+        $$
+        \begin{itemize}
+            \item Gets smaller as $\gamma$ increases
+        \end{itemize}
+    \end{itemize}
+    \vspace{1.5em}
+
+    \item Both division and evaluation fingerprinting are homomorphic, meaning that the fingerprint of the sum of two data vectors is equal to the sum of their fingerprints:
+    \begin{itemize}
+        \item $r \in K$, $d, d^\prime \in \mathbbm{F}^\delta$, and $b \in \mathbbm{F}$
+        \item Additive homomorphism:
+        \begin{itemize}
+            \item $fp(r, d) + fp(r, d^\prime) = fp(r, d + d^\prime)$
+            \item ``If you fingerprint two pieces of data separately and add the fingerprints together, you get the same result as if you had first added the data together and then fingerprinted the sum.''
+        \end{itemize}
+
+        \item Multiplicative homomorphism:
+        \begin{itemize}
+            \item $b \cdot fp(r, d) = fp(r, b \cdot d)$
+            \item ``If you fingerprint data and then multiply the fingerprint by some constant, you get the same result as if you had first multiplied the data by that constant and then fingerprinted it.''
+        \end{itemize}
+    \end{itemize}
+    \vspace{1.5em}
+
+    \item Cross-checksum fingerprinting
+    \begin{itemize}
+        \item Cross checksum: An array containing a hash of each fragment
+        \item Old way:
+        \begin{itemize}
+            \item Send fragment, checksum
+            \item To verify that all fragments came from the same block: reconstruct block; re-encode all n fragments; hash each one and compare cross-checksum
+            \item Very computationally expensive
+        \end{itemize}
+        \vspace{0.5em}
+
+        \item What this paper proposes:
+        \begin{itemize}
+            \item fpcc.cc array of size n - n fragments, n cross-checksums
+            \item fpcc.fp array of size m - m fingerprints, able to reconstruct the original block from m fragments
+            \item Ensuring fragment $d_i$:
+            \begin{enumerate}
+                \item hash($d_i$) = fpcc.cc[i]?
+                \item fp(r, $d_i$) = encode(fpcc.fp[1], \dots, fpcc.fp[m])?
+            \end{enumerate}
+            \item Even if a malicious adversary tries really hard (e.g., makes $\mathcal{X}$ queries, tries different fragment combinations), the probability they can create fragments that (1) all pass verification (look valid) but (2) reconstruct to different blocks ($B \neq B^\prime$) is astronomically small.
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+
+\subsection*{\underline{Questions}}
+\begin{enumerate}
+    \item What is an erasure code?
+    \vspace{1em}
+
+    \item ``An $\varepsilon$-\textit{fingerprinting function} $fp: K \times \mathbbm{F}^\delta \rightarrow \mathbbm{F}^\gamma$ satisfies'' $$\max_{\substack{d, d^\prime \in \mathbbm{F}^\delta \\ d \neq d^\prime}} \Pr \left[ fp(r, d) = fp(r, d^\prime) : r \xleftarrow{\text{R}} K \right] \leq \varepsilon $$
+    \begin{itemize}
+        \item Can you translate $fp$ into English? 
+        \item What is $K$? 
+        \item What is $\mathbbm{F}^\delta$? 
+        \item What is $\mathbbm{F}^\gamma$?
+    \end{itemize}
+    \vspace{1em}
+    
+    \item ``...a deterministic algorithm that outputs monic irreducible polynomials of prime degree $\gamma$...''
+    \begin{itemize}
+        \item What is a monic irreducible polynomial?
+        \item What does $\gamma$ represent? What is a ``prime degree''?
+    \end{itemize}
+    \vspace{1em}
+\end{enumerate}
+
+\subsection*{\underline{Potential Further Reading}}
+\begin{enumerate}
+    \item Source [26]: Reed-Solomon codes
+    \item Source [25]: Rabin's information dispersal algorithm
+\end{enumerate}
+
+\vspace{2em}
+\Huge
+    \textbf{BOOKMARK: p. 4, Section 2.2}
+\normalsize
+
+\end{document}
