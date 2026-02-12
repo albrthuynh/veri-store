@@ -1,0 +1,289 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{example}{Example}
+
+\title{Homomorphic Fingerprinting Theory\\for Veri-Store Implementation}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This document provides a technical foundation for implementing homomorphic fingerprinting in the \texttt{veri-store} distributed object storage system. Based on the work of Hendricks et al. (PODC 2007), the following outlines the mathematical theory, provides concrete examples, and specifies the implementation approach.
+
+\subsection{Problem Context}
+
+In erasure-coded storage systems using an $m$-of-$n$ encoding, a data block $B$ is encoded into $n$ fragments $\{d_1, d_2, \ldots, d_n\}$ such that any $m$ fragments suffice for reconstruction. The fundamental challenge is: \textbf{how do we verify that all fragments correspond to the same original block $B$ without reconstructing it?} (Recontruction is expensive in terms of bandwidth and computation.)
+
+Without such verification, different subsets of fragments could reconstruct different blocks, violating data consistency. Traditional approaches require either (1) sending the entire block to all servers (no bandwidth savings), or (2) reconstructing and re-encoding all $n$ fragments during verification (high computational cost).
+
+\subsection{The Homomorphic Fingerprinting Solution}
+
+Homomorphic fingerprinting provides an elegant solution: compact fingerprints that preserve the algebraic structure of the erasure code. This allows each server to independently verify that its fragment was correctly encoded from the original block, using only small fingerprints rather than full fragments.
+
+\section{Core Definitions}
+
+\subsection{Notation and Finite Fields}
+
+This document utilizes the following notation:
+\begin{itemize}
+    \item $\mathbb{F}$: A finite field with operators ``$+$'' and ``$\cdot$''
+    \item $\mathbb{F}_{q^k}$: A finite field of order (size) $q^k$ where $q$ is prime
+    \item $\mathbb{F}_{q^k}[x]$: Set of polynomials with coefficients in $\mathbb{F}_{q^k}$
+    \item $d(x) \in \mathbb{F}_{q^k}[x]$: Polynomial representation of data vector $d$
+\end{itemize}
+
+For our implementation, we will use $\mathbb{F}_{2^8 = 256}$ (the field of bytes), making field arithmetic efficient on standard hardware.
+
+\subsection{Fingerprinting Functions}
+
+\begin{definition}[Fingerprinting Function]
+An $\varepsilon$-fingerprinting function $fp : \mathcal{K} \times \mathbb{F}^\delta \to \mathbb{F}^\gamma$ satisfies:
+\[
+\max_{\substack{d, d' \in \mathbb{F}^\delta \\ d \neq d'}} \Pr\left[fp(r, d) = fp(r, d') : r \xleftarrow{R} \mathcal{K}\right] \leq \varepsilon
+\]
+where $r$ is randomly selected from keyspace $\mathcal{K}$.
+\end{definition}
+
+Translation: the probability that two different data fragments produce the same fingerprint is at most $\varepsilon$ when the fingerprinting parameter $r$ is chosen randomly. This is analogous to collision resistance in hash functions.
+
+\subsection{Homomorphic Property}
+
+\begin{definition}[Homomorphic Fingerprinting]
+A fingerprinting function $fp : \mathcal{K} \times \mathbb{F}^\delta \to \mathbb{F}^\gamma$ is \textbf{homomorphic} if for any $r \in \mathcal{K}$, any $d, d' \in \mathbb{F}^\delta$, and any scalar $b \in \mathbb{F}$:
+\begin{align}
+fp(r, d) + fp(r, d') &= fp(r, d + d') \label{eq:add-homomorphism} \\
+b \cdot fp(r, d) &= fp(r, b \cdot d) \label{eq:scalar-homomorphism}
+\end{align}
+\end{definition}
+
+This property is \textit{crucial}: it means fingerprints preserve the linear algebraic structure of the underlying data, which is exactly what erasure codes use.
+
+\section{Two Homomorphic Fingerprinting Functions}
+
+\subsection{Division Fingerprinting}
+
+Division fingerprinting computes the fingerprint as the remainder when dividing a polynomial representation of the data by a random irreducible polynomial.
+
+\begin{theorem}[Division Fingerprinting]
+Let $\mathbb{F}_{q^k}$ be a finite field of order $q^k$, and let $P_{q^k} : \mathcal{K} \to \mathbb{F}_{q^k}[x]$ select a monic irreducible polynomial of degree $\gamma$ uniformly at random. Then:
+\[
+fp(r, d(x)) = d(x) \bmod p(x),
+\]
+where $p(x) \leftarrow P_{q^k}(r)$ is an $\varepsilon$-fingerprinting function with $\varepsilon \approx \frac{\delta}{q^{k\gamma}}$.
+\end{theorem}
+
+\begin{example}[Division Fingerprinting over $\mathbb{F}_{256}$]
+Let's compute a fingerprint using division over $\mathbb{F}_{2^8}$ (bytes):
+\begin{itemize}
+    \item Data: $d = [0x42, 0x7A, 0x3E]$ (3 bytes)
+    \item Polynomial representation: $d(x) = 0x42 + 0x7A \cdot x + 0x3E \cdot x^2$
+    \item Random irreducible polynomial: $p(x) = x^2 + x + 0x01$ (degree $\gamma = 2$)
+    \item Fingerprint: $fp(r, d(x)) = d(x) \bmod p(x)$
+\end{itemize}
+
+Computing the division (using $\mathbb{F}_{2^8}$ arithmetic):
+\begin{align*}
+d(x) &= (0x3E \cdot x + \text{quotient}) \cdot p(x) + \text{remainder} \\
+fp(r, d) &= \text{remainder} = [r_0, r_1] \text{ (2 bytes)}
+\end{align*}
+
+The collision probability is $\varepsilon \approx \frac{3}{2^{16}} \approx 4.6 \times 10^{-5}$.
+\end{example}
+
+\subsection{Evaluation Fingerprinting}
+
+Evaluation fingerprinting treats data as a bivariate polynomial and evaluates it at a random point.
+
+\begin{theorem}[Evaluation Fingerprinting]
+Let $\mathbb{F}_{q^{k\gamma}} = \mathbb{F}_{q^k}[x]/p(x)$ be an extension field, and let $S : \mathcal{K} \to \mathbb{F}_{q^{k\gamma}}$ select a random element. Then:
+\[
+fp(r, d(y,x)) = d(s(x), x), \quad \text{where } s(x) \leftarrow S(r)
+\]
+is an $\varepsilon$-fingerprinting function with $\varepsilon = \frac{\delta/\gamma}{q^{k\gamma}}$.
+\end{theorem}
+
+\section{Application to Erasure Codes}
+
+\subsection{Linear Erasure Codes}
+
+\begin{definition}[Linear Erasure Code]
+An $m$-of-$n$ erasure code is \textbf{linear} if there exist fixed constants $b_{ij} \in \mathbb{F}$ for $1 \leq i \leq n$ and $1 \leq j \leq m$ such that for any block $B$:
+\[
+d_i = \sum_{j=1}^{m} b_{ij} \cdot d_j
+\]
+where $(d_1, \ldots, d_n) \leftarrow \text{encode}(B)$.
+\end{definition}
+
+Translation: Each fragment $d_i$ is a linear combination of the first $m$ fragments. This is true for many common erasure codes, including Reed-Solomon codes and Rabin's Information Dispersal Algorithm. These are both linear erasure codes over finite fields, making them compatible with homomorphic fingerprinting.
+
+\subsection{The Key Theorem}
+
+\begin{theorem}[Fingerprint Encoding Consistency]
+Let $fp : \mathcal{K} \times \mathbb{F}^\delta \to \mathbb{F}^\gamma$ be a homomorphic $\varepsilon$-fingerprinting function, and let $(\text{encode}, \text{decode})$ be a linear erasure code with coefficients $b_{ij} \in \mathbb{F}$. If $(d_1, \ldots, d_n) \leftarrow \text{encode}^\delta(B)$, then for any $r \in \mathcal{K}$ and any $1 \leq i \leq n$:
+\[
+fp(r, d_i) = \text{encode}^\gamma_i(fp(r, d_1), \ldots, fp(r, d_m))
+\]
+\end{theorem}
+
+\begin{proof}
+By the linearity of the erasure code:
+\begin{align*}
+fp(r, d_i) &= fp\left(r, \sum_{j=1}^{m} b_{ij} \cdot d_j\right) \\
+&= \sum_{j=1}^{m} b_{ij} \cdot fp(r, d_j) \quad \text{(by homomorphism)} \\
+&= \text{encode}^\gamma_i(fp(r, d_1), \ldots, fp(r, d_m)) \quad \text{(by linearity of encoding)}
+\end{align*}
+\end{proof}
+
+\textbf{Significance:} This theorem states that the fingerprint of any fragment equals the encoding of the fingerprints of the first $m$ fragments. Therefore, to verify fragment $d_i$:
+\begin{enumerate}
+    \item Compute $fp(r, d_i)$
+    \item Retrieve fingerprints $fp(r, d_1), \ldots, fp(r, d_m)$ from servers
+    \item Compute $\text{encode}^\gamma_i(fp(r, d_1), \ldots, fp(r, d_m))$
+    \item Verify equality (succeeds with probability $\geq 1 - \varepsilon$ if $d_i$ is correct)
+\end{enumerate}
+
+\begin{example}[3-of-5 Reed-Solomon Verification]
+Consider a 3-of-5 Reed-Solomon code over $\mathbb{F}_{256}$:
+\begin{itemize}
+    \item Original block: $B = [B_0, B_1, B_2]$ (3 bytes)
+    \item Encoded fragments: $d_1 = B_0$, $d_2 = B_1$, $d_3 = B_2$
+    \item Parity fragments: $d_4 = B_0 + 2B_1 + 4B_2$, $d_5 = B_0 + 3B_1 + 9B_2$
+\end{itemize}
+
+To verify fragment $d_4$ using division fingerprinting with $\gamma = 128$ bits:
+\begin{enumerate}
+    \item Compute fingerprints: $f_1 = fp(r, d_1)$, $f_2 = fp(r, d_2)$, $f_3 = fp(r, d_3)$
+    \item Compute expected fingerprint: $f_4' = f_1 + 2f_2 + 4f_3$ (16 bytes)
+    \item Compute actual fingerprint: $f_4 = fp(r, d_4)$ (16 bytes)
+    \item Verify: $f_4 \stackrel{?}{=} f_4'$ (succeeds with probability $\geq 1 - \varepsilon \approx 0.9999999$)
+\end{enumerate}
+
+Total communication: $3 \times 16 = 48$ bytes (fingerprints) instead of $3 \times 1\text{MB}$ (full fragments).
+\end{example}
+
+\section{Implementation Plan}
+
+\subsection{Technology Choices}
+
+\textbf{Fingerprinting Function:} Division fingerprinting over $\mathbb{F}_{2^8}$
+\begin{itemize}
+    \item \textbf{Pros:} Fast implementation, efficient byte-wise operations, well-studied
+    \item \textbf{Cons:} Slightly higher collision probability than evaluation fingerprinting
+\end{itemize}
+
+\textbf{Finite Field:} $\mathbb{F}_{2^8} = \mathbb{F}_2[x] / (x^8 + x^4 + x^3 + x + 1)$
+\begin{itemize}
+    \item Field elements are bytes (8 bits)
+    \item Operations implementable via lookup tables
+    \item Compatible with standard Reed-Solomon libraries
+\end{itemize}
+
+\textbf{Security Parameters:}
+\begin{itemize}
+    \item Fingerprint size: $\gamma = 128$ bits (16 bytes)
+    \item For 1MB fragments ($\delta = 2^{20}$ bytes): $\varepsilon \approx \frac{2^{20}}{2^{128}} \approx 2.3 \times 10^{-33}$
+    \item Negligible collision probability for all practical purposes
+\end{itemize}
+
+\subsection{Pseudocode}
+
+\begin{algorithm}
+\caption{Division Fingerprinting Computation}
+\begin{algorithmic}[1]
+\REQUIRE Data fragment $d$ (byte array), random key $r$
+\ENSURE Fingerprint $fp$ (16-byte array)
+\STATE $p(x) \leftarrow \text{IrreduciblePoly}(r, \gamma=128)$ \COMMENT{Degree-128 polynomial over $\mathbb{F}_{256}$}
+\STATE $d(x) \leftarrow \text{BytesToPoly}(d)$ \COMMENT{Convert data to polynomial}
+\STATE $fp(x) \leftarrow d(x) \bmod p(x)$ \COMMENT{Polynomial division over $\mathbb{F}_{256}$}
+\STATE \textbf{return} $\text{PolyToBytes}(fp(x))$ \COMMENT{Convert back to bytes}
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{Fragment Verification}
+\begin{algorithmic}[1]
+\REQUIRE Fragment $d_i$, fingerprints $\{fp(r, d_1), \ldots, fp(r, d_m)\}$, encoding coefficients $\{b_{ij}\}$
+\ENSURE \texttt{True} if fragment is valid, \texttt{False} otherwise
+\STATE $f_i \leftarrow \text{DivisionFingerprint}(d_i, r)$
+\STATE $f_i' \leftarrow \sum_{j=1}^{m} b_{ij} \cdot fp(r, d_j)$ \COMMENT{Encode fingerprints}
+\STATE \textbf{return} $(f_i == f_i')$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Python Libraries}
+
+We will use the following libraries for implementation:
+\begin{itemize}
+    \item \texttt{galois}: Python package for finite field arithmetic (\url{https://github.com/mhostetter/galois})
+    \item \texttt{pyfinite}: Alternative for $\mathbb{F}_{2^8}$ operations
+    \item \texttt{numpy}: Efficient array operations for polynomial manipulation
+\end{itemize}
+
+Example usage:
+\begin{verbatim}
+import galois
+import numpy as np
+
+# Define GF(2^8) with standard polynomial
+GF256 = galois.GF(2**8)
+
+# Generate random irreducible polynomial of degree 128
+p = galois.irreducible_poly(2, 128)
+
+# Compute fingerprint: d(x) mod p(x)
+d_poly = GF256(data_bytes)  # Convert bytes to polynomial
+fp = np.polydiv(d_poly, p)[1]  # Remainder is fingerprint
+\end{verbatim}
+
+\section{Security Analysis}
+
+\subsection{Collision Probability}
+
+For our chosen parameters ($\gamma = 128$ bits, $\mathbb{F}_{2^8}$):
+\begin{itemize}
+    \item Fragment size: $\delta = 2^{20}$ bytes (1 MB)
+    \item Collision probability: $\varepsilon \approx \frac{2^{20}}{2^{128}} \approx 2.3 \times 10^{-33}$
+    \item With 1 billion verification attempts: probability of any collision $\approx 2.3 \times 10^{-24}$
+\end{itemize}
+
+This provides a security level comparable to SHA-256 truncated to 128 bits, which is sufficient for our distributed storage application.
+
+\subsection{Attack Resistance}
+
+\textbf{Fragment Forgery:} An attacker attempting to create a fake fragment $d_i'$ that passes verification must solve:
+\[
+fp(r, d_i') = \text{encode}^\gamma_i(fp(r, d_1), \ldots, fp(r, d_m))
+\]
+Without knowing $r$, the attacker must guess a polynomial $d_i'(x)$ such that its remainder modulo a random irreducible polynomial equals a specific target value. Success probability is $\varepsilon \approx 2.3 \times 10^{-33}$.
+
+\textbf{Collision Attacks:} Finding two fragments $d, d'$ with $fp(r, d) = fp(r, d')$ requires trying approximately $\sqrt{2^{128}} = 2^{64}$ candidates (birthday paradox), which is computationally infeasible.
+
+\section{Conclusion}
+
+Homomorphic fingerprinting provides an elegant and efficient solution for verifying erasure-coded fragments without reconstruction. By leveraging the algebraic structure of linear codes, we can verify fragment consistency using compact 16-byte fingerprints instead of megabyte-sized fragments.
+
+Our implementation plan uses division fingerprinting over $\mathbb{F}_{2^8}$ with 128-bit fingerprints, providing negligible collision probability ($\approx 10^{-33}$) while maintaining efficient computation through byte-wise operations.
+
+\textbf{Next Steps:}
+\begin{enumerate}
+    \item Implement \texttt{DivisionFingerprint} function using \texttt{galois} library
+    \item Test fingerprint computation on sample data
+    \item Implement fingerprint-based fragment verification
+    \item Integrate with Reed-Solomon encoding/decoding
+    \item Measure performance: fingerprint computation time, verification overhead
+\end{enumerate}
+
+\end{document}
