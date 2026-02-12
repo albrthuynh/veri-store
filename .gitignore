@@ -1,0 +1,65 @@
+# Venv
+.venv/
+
+# Python stuff
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+.cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables / secrets 
+.env
+.env.*
+!.env.example
+
+# Numerous always-ignore extensions
+*.diff
+*.err
+*.orig
+*.log
+*.rej
+*.swo
+*.swp
+*.bmml
+*.vi
+*~
+
+# OS or Editor folders
+.DS_Store
+Thumbs.db
+.cache
+.project
+.settings
+.tmproj
+*.esproj
+nbproject
+
+# Archives
+*.zip
+*.7z
+*.rar
+*.tar.gz
+
+# Folders to ignore
+.hg
+.svn
+.CVS
+intermediate
+publish
+build_*
+
+# build script local files
+config.rb
+build/buildinfo.properties
+build/config/buildinfo.properties
