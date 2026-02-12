@@ -5,10 +5,10 @@
 ### Week 1: Foundation & Setup
 
 #### Mac (Security/Software Engineering)
-- [ ] Research homomorphic fingerprinting theory from paper
+- [X] Research homomorphic fingerprinting theory from paper
 - [ ] Design security model: what attacks to defend against
-- [ ] Set up Python project structure with proper modules
-- [ ] Research SHA-256 and cryptographic primitives in Python
+- [X] Set up Python project structure with proper modules
+- [X] Research SHA-256 and cryptographic primitives in Python
 
 #### Albert (Systems/Backend)
 - [ ] Research erasure coding fundamentals (Reed-Solomon)
