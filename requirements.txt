@@ -1,0 +1,22 @@
+# veri-store runtime dependencies
+
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# HTTP client (used by VeriStoreClient and FastAPI TestClient)
+httpx>=0.27.0
+
+# Data validation for API models
+pydantic>=2.6.0
+
+# Finite field arithmetic (GF(2^8) matrix operations)
+galois>=0.3.8
+numpy>=1.26.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# (Optional) reedsolo as a reference implementation / cross-check
+# reedsolo>=1.7.0
