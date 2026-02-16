@@ -17,9 +17,9 @@
 - [ ] Research `reedsolo` library or alternatives for erasure coding
 
 #### Joint
-- [ ] Read and discuss paper sections 1-3 together
+- [X] Read and discuss paper sections 1-3 together
 - [ ] Define API contract (PUT object, GET object, DELETE object)
-- [ ] Set up Git repository with proper .gitignore and README
+- [X] Set up Git repository with proper .gitignore and README
 
 ---
 
