@@ -20,7 +20,7 @@
 
 \title{Veri-Store Security Model}
 \author{Mac Payton \& Albert Huynh}
-\date{February 16, 2026 \\ Version 0.1}
+\date{\today \\ Version 0.1.001}
 
 \begin{document}
 
@@ -105,18 +105,42 @@
 
 \subsection{External Libraries}
 
+\subsubsection*{Mathematical operations and erasure coding}
 \begin{itemize}
-\item \textbf{galois}: % Finite field arithmetic over F_256
-\item \textbf{numpy}: % Array operations and polynomial manipulation
-\item \textbf{Python standard library}: % Networking, file I/O, cryptographic primitives
+    \item \texttt{\textbf{galois} [$\geq$ v0.3.8]}: Finite field arithmetic over $\mathbb{F}_{256}$
+    \item \texttt{\textbf{numpy} [$\geq$ v1.26.0]}: Array operations and polynomial manipulation
+\end{itemize}
+
+\subsubsection*{Web framework}
+\begin{itemize}
+    \item \texttt{\textbf{fastapi} [$\geq$ v0.110.0]}: REST API for client-server communication
+    \item \texttt{\textbf{uvicorn} [$\geq$ v0.29.0]}: ASGI server for hosting the API
+\end{itemize}
+
+\subsubsection*{HTTP client}
+\begin{itemize}
+    \item \texttt{\textbf{httpx} [$\geq$ v0.27.0]}: For inter-server communication and fragment distribution
+\end{itemize}
+
+\subsubsection*{API data validation}
+\begin{itemize}
+    \item \texttt{\textbf{pydantic} [$\geq$ v2.6.0]}: Data validation and parsing for API requests/responses
+\end{itemize}
+
+\subsubsection*{Testing}
+\begin{itemize}
+    \item \texttt{\textbf{pytest} [$\geq$ v8.0.0]}: For running unit and integration tests
+    \begin{itemize}
+        \item \texttt{\textbf{pytest-asyncio} [$\geq$ v0.23.0]}: For testing asynchronous code paths
+    \end{itemize}
 \end{itemize}
 
 \subsection{System Dependencies}
 
 \begin{itemize}
-\item \textbf{Network stack}: % TCP/IP for inter-server communication
-\item \textbf{File system}: % Local storage of fragments
-\item \textbf{Operating system}: % Process isolation, memory protection
+    \item \textbf{Network stack}: % TCP/IP for inter-server communication
+    \item \textbf{File system}: % Local storage of fragments
+    \item \textbf{Operating system}: % Process isolation, memory protection
 \end{itemize}
 
 \section{Implementation Assumptions}
@@ -128,11 +152,11 @@
 % fragment storage is atomic.
 
 \begin{itemize}
-\item placeholder % At most f out of n servers may be compromised or fail
-\item placeholder % Network communication channels are authenticated (or will be)
-\item placeholder % Storage servers have sufficient disk space for fragments
-\item placeholder % Homomorphic fingerprint collision probability is negligible
-\item placeholder % Erasure coding library correctly implements Reed-Solomon
+    \item At most $f$ out of $n$ total servers may be compromised or fail and the system will still maintain data integrity
+    \item Network communication channels are/will be authenticated
+    \item Storage servers have sufficient disk space for fragments of size $1/m$ of original block
+    \item Homomorphic fingerprint collision probability is negligible
+    \item Erasure coding library correctly implements Reed-Solomon
 \end{itemize}
 
 \section{Trust Levels}
@@ -148,6 +172,17 @@
 % COMMENT: Describe the system administrator trust level. This includes anyone with physical or
 % root access to the servers. Administrators have complete control over the system and can read,
 % modify, or delete any data. Security model assumes administrators are trusted and benign.
+\hspace{1.5em} System administrators have full access to the servers hosting the veri-store system and the stored data. They are responsible for maintaining the infrastructure, applying updates, and ensuring the system is running smoothly. The security model assumes that administrators are trusted and will not intentionally compromise data integrity or confidentiality. However, they have the capability to access stored fragments and fingerprints, so it is important to consider this trust level when designing mitigations for information disclosure threats.
+\vspace{1em}
+
+\noindent Example System Administrators:
+\begin{itemize}
+    \item Developers (e.g., Albert and Mac) during development and testing
+    \item IT staff responsible for server/data maintenance in a production deployment
+    \item Cloud provider administrators if deployed on cloud infrastructure (e.g., AWS, Azure)
+    \item System operators with root access to physical or virtual servers
+    \item \textit{Additional examples to be added}
+\end{itemize}
 
 \subsection{Authenticated Client}
 
@@ -752,7 +787,12 @@
 \subsection{Version History}
 
 \begin{itemize}
-\item \textbf{Version 0.1} (February 16, 2026): Initial draft - high-level security model with component stubs
+    \item \textbf{Version 0.1} (February 16, 2026): Initial draft - high-level security model with component stubs
+    \item \textbf{Version 0.1.001} (February 16, 2026):
+    \begin{itemize}
+        \item Added descriptions of external libraries
+        \item Added Administrator trust level and example administrators
+    \end{itemize}
 \end{itemize}
 
 \end{document}
