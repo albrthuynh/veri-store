@@ -2,8 +2,7 @@
 field.py -- Arithmetic in GF(2^8), the finite field with 256 elements.
 
 Elements are bytes (integers 0-255).  Addition is XOR; multiplication uses the
-standard AES irreducible polynomial x^8 + x^4 + x^3 + x + 1 (0x11B) unless a
-different modulus is provided.
+standard AES irreducible polynomial x^8 + x^4 + x^3 + x + 1 (0x11B).
 
 This field is the coefficient domain for all fingerprint polynomials.
 
@@ -15,10 +14,25 @@ References:
 from __future__ import annotations
 
 
-# TODO: Replace with the irreducible polynomial chosen for veri-store.
-#       AES uses 0x11B (x^8 + x^4 + x^3 + x + 1); verify this is appropriate.
 IRREDUCIBLE_POLY: int = 0x11B
 
+# Pre-compute the multiplicative inverse table for all non-zero elements.
+_INVERSE_TABLE = [0] * 256
+for _a in range (1, 256):
+    for _b in range(1, 256):
+        _result, _x, _y = 0, _a, _b
+
+        while _y > 0:
+            if _y & 1:
+                _result ^= _x
+            _y >>= 1
+            _x <<= 1
+
+            if _x & 0x100:
+                _x ^= IRREDUCIBLE_POLY
+        if _result == 1:
+            _INVERSE_TABLE[_a] = _b
+            break
 
 class GF256:
     """An element of GF(2^8).
@@ -37,8 +51,7 @@ class GF256:
             value: Integer in [0, 255].  Values outside this range are reduced
                    modulo 256 (i.e., only the low 8 bits are kept).
         """
-        # TODO: Validate and mask value to 8 bits.
-        ...
+        self.value = value & 0xFF
 
     # ------------------------------------------------------------------
     # Arithmetic operators
@@ -55,8 +68,7 @@ class GF256:
         Returns:
             A new GF256 element equal to self XOR other.
         """
-        # TODO: Implement XOR addition.
-        ...
+        return GF256(self.value ^ other.value)
 
     def __sub__(self, other: GF256) -> GF256:
         """Field subtraction: identical to addition in characteristic 2 (XOR).
@@ -67,8 +79,7 @@ class GF256:
         Returns:
             A new GF256 element (same as __add__ in GF(2^8)).
         """
-        # TODO: Subtraction == addition in GF(2^k).
-        ...
+        return self + other
 
     def __mul__(self, other: GF256) -> GF256:
         """Field multiplication modulo the irreducible polynomial.
@@ -81,8 +92,21 @@ class GF256:
         Returns:
             A new GF256 element equal to (self * other) mod IRREDUCIBLE_POLY.
         """
-        # TODO: Implement carry-less multiplication with reduction.
-        ...
+        self_int = self.value
+        other_int = other.value
+        result = 0
+
+        while other_int > 0:
+            if other_int & 1:
+                result ^= self_int
+            
+            other_int >>= 1
+            self_int <<= 1
+            if self_int & 0x100:
+                self_int ^= IRREDUCIBLE_POLY
+
+        return GF256(result)
+
 
     def __truediv__(self, other: GF256) -> GF256:
         """Field division: self * other^{-1}.
@@ -96,9 +120,9 @@ class GF256:
         Raises:
             ZeroDivisionError: If other is the zero element.
         """
-        # TODO: Compute multiplicative inverse via Fermat's little theorem
-        #       (other^(254) in GF(2^8)) or extended Euclidean algorithm.
-        ...
+        if other.value == 0:
+            raise ZeroDivisionError("division by zero in GF(2^8)")
+        return self * other.inverse()
 
     def __pow__(self, exp: int) -> GF256:
         """Exponentiation by repeated squaring in GF(2^8).
@@ -109,8 +133,14 @@ class GF256:
         Returns:
             A new GF256 element equal to self^exp.
         """
-        # TODO: Implement square-and-multiply.
-        ...
+        result = GF256(1)
+        base = GF256(self.value)
+        while exp > 0:
+            if exp & 1:
+                result = result * base
+            base = base * base
+            exp >>= 1
+        return result
 
     def inverse(self) -> GF256:
         """Multiplicative inverse via Fermat's little theorem: self^(q-2).
@@ -123,8 +153,9 @@ class GF256:
         Raises:
             ZeroDivisionError: If self is the zero element.
         """
-        # TODO: return self ** 254
-        ...
+        if self.value == 0:
+            raise ZeroDivisionError("zero element has no multiplicative inverse in GF(2^8)")
+        return GF256(_INVERSE_TABLE[self.value])
 
     # ------------------------------------------------------------------
     # Comparison and representation
@@ -132,24 +163,21 @@ class GF256:
 
     def __eq__(self, other: object) -> bool:
         """Equality check based on integer value."""
-        # TODO: Compare .value attributes.
-        ...
+        if not isinstance(other, GF256):
+            return False
+        return self.value == other.value
 
     def __hash__(self) -> int:
         """Hash based on integer value (needed for use in sets/dicts)."""
-        # TODO: return hash(self.value)
-        ...
+        return hash(self.value)
 
     def __repr__(self) -> str:
         """Human-readable representation."""
-        # TODO: return f"GF256(0x{self.value:02X})"
-        ...
+        return f"GF256(Hexadecimal: 0x{self.value:02X}, Decimal: {self.value}, Binary: {self.value:08b})"
 
     def __int__(self) -> int:
         """Convert to plain Python int."""
-        # TODO: return self.value
-        ...
-
+        return self.value
 
 # ---------------------------------------------------------------------------
 # Module-level helpers
@@ -169,5 +197,17 @@ def build_exp_log_tables(poly: int = IRREDUCIBLE_POLY) -> tuple[list[int], list[
         exp_table[i] = g^i mod poly where g=2 is the primitive element.
         log_table[v] = i such that g^i = v  (log_table[0] is undefined).
     """
-    # TODO: Build tables by repeatedly multiplying the generator (0x02).
-    ...
+    exp_table = [0] * 256
+    log_table = [0] * 256
+
+    x = 1
+    for i in range(255):
+        exp_table[i] = x
+        log_table[x] = i
+        x <<= 1
+        if x & 0x100:
+            x ^= IRREDUCIBLE_POLY
+
+    exp_table[255] = 1  # g^255 == g^0 == 1 (the group has order 255)
+
+    return exp_table, log_table
