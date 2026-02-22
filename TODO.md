@@ -6,7 +6,7 @@
 
 #### Mac (Security/Software Engineering)
 - [X] Research homomorphic fingerprinting theory from paper
-- [ ] Design security model: what attacks to defend against
+- [X] Design security model: what attacks to defend against
 - [X] Set up Python project structure with proper modules
 - [X] Research SHA-256 and cryptographic primitives in Python
 
@@ -18,7 +18,7 @@
 
 #### Joint
 - [X] Read and discuss paper sections 1-3 together
-- [ ] Define API contract (PUT object, GET object, DELETE object)
+- [X] Define API contract (PUT object, GET object, DELETE object)
 - [X] Set up Git repository with proper .gitignore and README
 
 ---
