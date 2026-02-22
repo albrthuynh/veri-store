@@ -17,7 +17,8 @@ Cauchy-matrix implementation via the `galois` library.
 
 from __future__ import annotations
 from dataclasses import dataclass
-
+from reedsolo import RSCodec, ReedSolomonError
+import hashlib
 
 @dataclass
 class Fragment:
@@ -67,13 +68,55 @@ def encode(
         ValueError: If data is empty, or if m > n, or if n + m > 256
                     (Cauchy matrix constraint).
     """
-    # TODO: 1. Validate arguments (m <= n, n+m <= 256, data non-empty).
-    # TODO: 2. Compute block_id = SHA-256(data).hex() if block_id is empty.
-    # TODO: 3. Pad data so that len(data) is a multiple of m.
-    # TODO: 4. Split padded data into m equal-length byte chunks.
-    # TODO: 5. Build CodingMatrix(m, n).
-    # TODO: 6. For each byte position, apply encoding matrix across chunks.
-    # TODO: 7. Collect results into n Fragment objects.
+    # Validate arguments (m <= n, n+m <= 256, data non-empty).
+    if m > n or n + m > 256 or not data:
+        raise ValueError("Arguments are invalid")
+
+    # Compute block_id = SHA-256(data).hex() if block_id is empty.
+    if not block_id:
+        block_id = hashlib.sha256(data).hexdigest()
+
+    # Pad data so that len(data) is a multiple of m.
+    padded_data = _pad(data, m)
+
+    # Split padded data into m equal-length byte chunks.
+    byte_chunks = []
+    chunk_size = len(padded_data) // m
+
+    for i in range(0, len(padded_data), chunk_size):
+        byte_chunks.append(padded_data[i: i + chunk_size + 1])
+
+
+    # For each byte position, apply encoding matrix across chunks.
+    rsc = RSCodec(n - m)
+
+    fragment_outputs = [bytearray() for _ in range(n)]
+
+    for i in range(m):
+        # Grabbing the "stripe" from each of the chunks
+        stripe = bytes([chunk[i] for chunk in byte_chunks])
+    
+        # Encode this stripe to get the full codeword (data + parity), this returns a byte string of length n
+        codeword = rsc.encode(stripe)
+    
+        # Then distribute the n bytes to our n fragment buffers
+        for j in range(n):
+            fragment_outputs[j].append(codeword[j])
+
+    # Collect results into n Fragment objects.
+    fragments = []
+    for i in range(len(fragment_outputs)):
+        fragments.append(Fragment(
+            index = i,
+            data = bytes(fragment_outputs[i]),
+            block_id = block_id,
+            total_n = n,
+            threshold_m = m,
+            original_length = len(data)
+        ))
+
+        return fragments
+
     ...
 
 
@@ -87,5 +130,9 @@ def _pad(data: bytes, m: int) -> bytes:
     Returns:
         Padded bytes of length ceil(len(data) / m) * m.
     """
-    # TODO: Compute remainder and append b'\\x00' * padding_needed.
-    ...
+    padding_needed = len(data) % m
+
+    return data + (b'\x00' * padding_needed)
+
+
+
