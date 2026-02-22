@@ -8,6 +8,8 @@
 - We need to decide how many data and parity fragments to make
 - Provides strong fault tolerance while keeping storage use efficient
 
+Youtube Link: https://www.youtube.com/watch?v=Q5kVuM7zEUI
+
 ## Library Chosen
 
 For this project we will use the reedsolo library.
@@ -65,7 +67,7 @@ What each shard server stores per object version:
 ### Request flows (AVID-FP style)
 
 **1) PUT (write / dispersal)**  
-Goal: send fragment_i + fpcc to each server; each server verifies and stores.
+Goal: send fragment_i + fpcc to each server; each server verifies and stores. This is the split and distribute.
 
 - Client reads bytes → (optional) stripes → RS encode (k=3, n=5).
 - Client hashes each fragment to get cc[1..5], sets r = H(cc[1]||…||cc[5]), and builds fingerprints fp[1..3] for the first k data fragments.
@@ -85,7 +87,7 @@ Goal: agree on one fpcc, then collect 3 fragments consistent with it.
 Even if a server returns a bad fragment, it fails the fpcc check and is discarded.
 
 **3) DELETE**  
-- **Tombstone:** client writes a tombstone manifest (special fpcc record) to all servers. Servers mark “deleted” so GET returns 404; fragments can be garbage-collected later. For a class project, tombstone is usually cleaner and consistent under failures.
+- **Tombstone:** client writes a tombstone manifest (special fpcc record) to all servers. Servers mark “deleted” so GET returns 404; fragments can be garbage-collected later. Tombstone is usually cleaner and consistent under failures.
 
 ### Fault model (3-of-5 demo)
 
@@ -102,7 +104,3 @@ Even if a server returns a bad fragment, it fails the fpcc check and is discarde
 
 **Client CLI:**  
 `put <file> --key <k>`, `get --key <k> --out <file>`, `delete --key <k>`.
-
-### Where homomorphic fingerprinting sits
-
-Server on PUT: “Is my fragment consistent with this fpcc for my index i?” Client on GET: same check, then decode. Clean separation.
