@@ -26,9 +26,9 @@
 ### Week 2: Core Primitives
 
 #### Mac (Security/Software Engineering)
-- [X] Implement finite field arithmetic (F₂₅₆) primitives
-- [ ] Implement irreducible polynomial generation for fingerprinting
-- [ ] Write unit tests for field operations
+- [X] Implement finite field arithmetic (F₂₅₆) primitivesimpleme
+- [X] Implement irreducible polynomial generation for fingerprinting
+- [X] Write unit tests for field operations
 - [ ] Research random oracle implementation (deterministic r generation)
 
 #### Albert (Systems/Backend)
