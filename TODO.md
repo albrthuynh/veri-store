@@ -29,7 +29,7 @@
 - [X] Implement finite field arithmetic (F₂₅₆) primitivesimpleme
 - [X] Implement irreducible polynomial generation for fingerprinting
 - [X] Write unit tests for field operations
-- [ ] Research random oracle implementation (deterministic r generation)
+- [X] Research random oracle implementation (deterministic r generation)
 
 #### Albert (Systems/Backend)
 - [ ] Implement basic erasure coding: encode function (data → 5 fragments)
