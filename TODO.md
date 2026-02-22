@@ -38,8 +38,8 @@
 #### Albert (Systems/Backend)
 
 - [x] Implement basic erasure coding: encode function (data → 5 fragments)
-- [ ] Implement decode function (any 3 fragments → original data)
-- [ ] Write unit tests for encode/decode with various data sizes
+- [X] Implement decode function (any 3 fragments → original data)
+- [X] Write unit tests for encode/decode with various data sizes
 - [x] Handle edge cases: padding, empty data
 
 #### Joint

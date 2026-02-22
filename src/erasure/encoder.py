@@ -92,13 +92,13 @@ def encode(
 
     fragment_outputs = [bytearray() for _ in range(n)]
 
-    for i in range(m):
+    for i in range(chunk_size):
         # Grabbing the "stripe" from each of the chunks
         stripe = bytes([chunk[i] for chunk in byte_chunks])
-    
+
         # Encode this stripe to get the full codeword (data + parity), this returns a byte string of length n
         codeword = rsc.encode(stripe)
-    
+
         # Then distribute the n bytes to our n fragment buffers
         for j in range(n):
             fragment_outputs[j].append(codeword[j])
@@ -107,17 +107,14 @@ def encode(
     fragments = []
     for i in range(len(fragment_outputs)):
         fragments.append(Fragment(
-            index = i,
-            data = bytes(fragment_outputs[i]),
-            block_id = block_id,
-            total_n = n,
-            threshold_m = m,
-            original_length = len(data)
+            index=i,
+            data=bytes(fragment_outputs[i]),
+            block_id=block_id,
+            total_n=n,
+            threshold_m=m,
+            original_length=len(data),
         ))
-
-        return fragments
-
-    ...
+    return fragments
 
 
 def _pad(data: bytes, m: int) -> bytes:
@@ -130,9 +127,9 @@ def _pad(data: bytes, m: int) -> bytes:
     Returns:
         Padded bytes of length ceil(len(data) / m) * m.
     """
-    padding_needed = len(data) % m
-
-    return data + (b'\x00' * padding_needed)
+    remainder = len(data) % m
+    padding_needed = (m - remainder) % m
+    return data + (b"\x00" * padding_needed)
 
 
 

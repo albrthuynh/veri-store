@@ -19,7 +19,7 @@ Public API:
 """
 
 from .encoder import encode
-from .decoder import decode
+from .decoder import decode, DecodingError
 from .matrix import CodingMatrix
 
 # Default coding parameters (3-of-5 scheme).
