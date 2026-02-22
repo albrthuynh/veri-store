@@ -11,10 +11,10 @@
 - [X] Research SHA-256 and cryptographic primitives in Python
 
 #### Albert (Systems/Backend)
-- [ ] Research erasure coding fundamentals (Reed-Solomon)
-- [ ] Design system architecture: client-server communication flow
-- [ ] Set up HTTP server framework (Flask/FastAPI)
-- [ ] Research `reedsolo` library or alternatives for erasure coding
+- [X] Research erasure coding fundamentals (Reed-Solomon)
+- [X] Design system architecture: client-server communication flow
+- [X] Set up HTTP server framework (Flask/FastAPI)
+- [X] Research `reedsolo` library or alternatives for erasure coding
 
 #### Joint
 - [X] Read and discuss paper sections 1-3 together
