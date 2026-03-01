@@ -30,7 +30,7 @@
 
 #### Mac (Security/Software Engineering)
 
-- [x] Implement finite field arithmetic (F₂₅₆) primitivesimpleme
+- [x] Implement finite field arithmetic (F₂₅₆) primitives
 - [x] Implement irreducible polynomial generation for fingerprinting
 - [x] Write unit tests for field operations
 - [x] Research random oracle implementation (deterministic r generation)
@@ -38,8 +38,8 @@
 #### Albert (Systems/Backend)
 
 - [x] Implement basic erasure coding: encode function (data → 5 fragments)
-- [X] Implement decode function (any 3 fragments → original data)
-- [X] Write unit tests for encode/decode with various data sizes
+- [x] Implement decode function (any 3 fragments → original data)
+- [x] Write unit tests for encode/decode with various data sizes
 - [x] Handle edge cases: padding, empty data
 
 #### Joint
@@ -80,6 +80,13 @@
 - [ ] Given fragment dᵢ and fpcc, verify consistency (Definition 3.3)
 - [ ] Handle verification failures gracefully (log errors, reject fragments)
 - [ ] Write tests for Byzantine fault detection
+- [x] **Security Model §4.1:** External Libraries — documented
+- [ ] **Security Model §1.1:** Write Document Purpose
+- [ ] **Security Model §1.2:** Write System Overview
+- [ ] **Security Model §3.1:** Write Primary Use Case
+- [ ] **Security Model §3.2:** Write Anti-Scenarios
+- [ ] **Security Model §6.2:** Write Authenticated Client trust level
+- [ ] **Security Model §6.4:** Write Untrusted Network trust level
 
 #### Albert (Systems/Backend)
 
@@ -87,11 +94,21 @@
 - [ ] Each server runs on different port (5001, 5002, ..., 5005)
 - [ ] Implement storage backend (save fragments to disk with metadata)
 - [ ] Implement server state management (track stored fragments)
+- [x] **Security Model §5:** Implementation Assumptions — documented
+- [x] **Security Model §6.1:** Administrator trust level — documented
+- [ ] **Security Model §2.1:** Write In Scope
+- [ ] **Security Model §2.2:** Write Out of Scope
+- [ ] **Security Model §4.2:** Write System Dependencies
+- [ ] **Security Model §6.3:** Write Storage Server trust level
+- [ ] **Security Model §7.1:** Write Client API entry points (store, retrieve, verify)
+- [ ] **Security Model §7.2:** Write Inter-Server Communication entry points
+- [ ] **Security Model §7.3:** Write Storage Subsystem entry points
 
 #### Joint
 
 - [ ] Test: start 5 servers, verify they respond to health checks
 - [ ] Test: send fragment to server, verify it stores correctly
+- [ ] **Security Model:** Review and sign off on §1–7 together
 
 ---
 
@@ -103,6 +120,10 @@
 - [ ] Verify server responses contain valid signatures
 - [ ] Implement retry logic for failed requests
 - [ ] Add logging for security events (verification failures)
+- [ ] **Security Model §8.1:** Write Data Blocks protected asset
+- [ ] **Security Model §8.2:** Write Erasure-Coded Fragments protected asset
+- [ ] **Security Model §8.3:** Write Homomorphic Fingerprints protected asset
+- [ ] **Security Model §8.4:** Write System Resources protected asset
 
 #### Albert (Systems/Backend)
 
@@ -110,11 +131,15 @@
 - [ ] Implement dispersal protocol: encode → compute fpcc → send to all servers
 - [ ] Implement retrieval protocol: request from all → collect 3 → decode
 - [ ] Handle network timeouts and server unavailability
+- [ ] **Security Model §9.1.1:** Write Client DFD component description
+- [ ] **Security Model §9.1.2–9.1.4:** Write Encode Block, Compute Fingerprint, Distribute Fragments descriptions
+- [ ] **Security Model §9.1.5–9.1.8:** Write Network, Fragment Storage, Verify Fragments, Reconstruct Block descriptions
 
 #### Joint
 
 - [ ] End-to-end test: client uploads object, 5 servers receive fragments
 - [ ] Test retrieval: client fetches object successfully
+- [ ] **Security Model:** Review §8 and §9.1 together; verify DFD matches implementation
 
 ---
 
@@ -126,6 +151,8 @@
 - [ ] Test detection: client should reject inconsistent fragments
 - [ ] Measure false positive rate (valid fragments incorrectly rejected)
 - [ ] Document security guarantees achieved
+- [ ] **Security Model §10.1:** Write Spoofing threats (S.1, S.2, S.3)
+- [ ] **Security Model §10.2:** Write Tampering threats (T.1, T.2, T.3, T.4)
 
 #### Albert (Systems/Backend)
 
@@ -133,12 +160,17 @@
 - [ ] Test retrieval with only 3/5 servers available
 - [ ] Implement graceful degradation (continue with failures)
 - [ ] Add metrics: success rate, fragments lost, recovery time
+- [ ] **Security Model §10.3:** Write Repudiation threats (R.1, R.2, R.3)
+- [ ] **Security Model §10.4:** Write Information Disclosure threats (I.1, I.2, I.3, I.4)
 
 #### Joint
 
 - [ ] Integration test: upload with 5 servers, retrieve with only 3
 - [ ] Test Byzantine detection: inject bad fragment, verify rejection
 - [ ] Test: 2 servers crash, system still works (3 remain)
+- [ ] **Security Model §10.5:** Write Denial of Service threats (D.1, D.2, D.3, D.4)
+- [ ] **Security Model §10.6:** Write Elevation of Privilege threats (E.1, E.2, E.3, E.4)
+- [ ] **Security Model:** Review complete §10 STRIDE analysis together
 
 ---
 
@@ -150,6 +182,8 @@
 - [ ] Add request validation (check payload structure)
 - [ ] Implement rate limiting per client
 - [ ] Add security headers to HTTP responses
+- [ ] **Security Model §11.1:** Write Spoofing threat resolutions (S.1, S.2, S.3)
+- [ ] **Security Model §11.2:** Write Tampering threat resolutions (T.1, T.2, T.3, T.4)
 
 #### Albert (Systems/Backend)
 
@@ -157,12 +191,17 @@
 - [ ] Add error messages in responses (JSON error objects)
 - [ ] Implement idempotency for PUT requests
 - [ ] Add request/response logging
+- [ ] **Security Model §11.3:** Write Repudiation threat resolutions (R.1, R.2, R.3)
+- [ ] **Security Model §11.4:** Write Information Disclosure threat resolutions (I.1, I.2, I.3, I.4)
 
 #### Joint
 
 - [ ] API documentation: document all endpoints with examples
 - [ ] Test with curl/Postman: verify API works as expected
 - [ ] Load testing: can system handle 100 concurrent requests?
+- [ ] **Security Model §11.5:** Write Denial of Service resolutions (D.1, D.2, D.3, D.4)
+- [ ] **Security Model §11.6:** Write Elevation of Privilege resolutions (E.1, E.2, E.3, E.4)
+- [ ] **Security Model:** Review complete §11 together; verify all resolutions match implementation
 
 ---
 
@@ -174,6 +213,9 @@
 - [ ] Test collision probability empirically (try to find collisions)
 - [ ] Penetration testing: try to break integrity guarantees
 - [ ] Verify Theorem 3.4 bound holds empirically
+- [ ] **Security Model §12.2:** Write Known Limitations
+- [ ] **Security Model §12.3:** Write Integration Considerations
+- [ ] **Security Model §13.1:** Write Security Test Suite
 
 #### Albert (Systems/Backend)
 
@@ -181,12 +223,16 @@
 - [ ] Test edge cases: empty files, 100MB files, binary data
 - [ ] Test concurrent clients accessing same object
 - [ ] Performance testing: measure throughput (objects/sec)
+- [ ] **Security Model §12.1:** Write Deployment Recommendations
+- [ ] **Security Model §13.2:** Write Code Review Process
+- [ ] **Security Model §13.3:** Write Regression Testing
 
 #### Joint
 
 - [ ] Bug fixing week: address all discovered issues
 - [ ] Code cleanup: remove dead code, improve documentation
 - [ ] Refactor: improve code quality based on learnings
+- [ ] **Security Model:** Review §12 and §13 together
 
 ---
 
@@ -198,6 +244,8 @@
 - [ ] Measure verification time per fragment
 - [ ] Create security analysis document
 - [ ] Prepare demo: show Byzantine fault detection
+- [ ] **Security Model:** Final proofreading pass — Mac sections (§1, §3, §4.1, §6.2, §6.4, §8, §10.1, §10.2, §11.1, §11.2, §12.2, §12.3, §13.1)
+- [ ] **Security Model:** Ensure all threat resolutions reference actual implementation (file/function names where possible)
 
 #### Albert (Systems/Backend)
 
@@ -205,12 +253,17 @@
 - [ ] Profile code: find bottlenecks (erasure coding? network?)
 - [ ] Optimize hot paths if possible
 - [ ] Create architecture diagram and system documentation
+- [ ] **Security Model §14.1:** Write Review Schedule
+- [ ] **Security Model §14.2:** Write Change Process
+- [ ] **Security Model:** Final proofreading pass — Albert sections (§2, §4.2, §5, §6.1, §6.3, §7, §9.1, §10.3, §10.4, §11.3, §11.4, §12.1, §13.2, §13.3)
 
 #### Joint
 
 - [ ] Write final report: introduction, implementation, evaluation
 - [ ] Create performance graphs (latency, throughput, overhead)
 - [ ] Prepare presentation slides
+- [ ] **Security Model §14.3:** Write Version History entry; bump document to v1.0
+- [ ] **Security Model:** Final joint sign-off; commit to main branch
 
 ---
 
@@ -242,9 +295,11 @@
 ## Key Milestones
 
 - **Week 2:** ✅ Core primitives working (erasure coding + fingerprinting)
-- **Week 4:** ✅ Basic client-server communication functional
-- **Week 6:** ✅ Fault tolerance demonstrated (crashes + Byzantine)
-- **Week 8:** ✅ All testing complete, system stable
+- **Week 4:** ✅ Basic client-server communication functional; §1–7 security model drafted
+- **Week 6:** ✅ Fault tolerance demonstrated (crashes + Byzantine); §10 STRIDE analysis complete
+- **Week 7:** ✅ §11 threat resolutions complete
+- **Week 8:** ✅ All testing complete, system stable; §12–13 complete
+- **Week 9:** ✅ Security model v1.0 complete and signed off
 - **Week 10:** ✅ Presentation ready, report submitted
 
 ---
@@ -289,6 +344,7 @@
 - [ ] API documentation
 - [ ] Architecture diagram
 - [ ] Final report (10-15 pages)
+- [ ] Security model v1.0 (fully populated, all §1–14 complete)
 
 ### Demo Requirements
 
@@ -296,6 +352,55 @@
 - [ ] Fault tolerance: crash 2 servers → still works
 - [ ] Byzantine detection: inject bad fragment → rejected
 - [ ] Performance metrics visualization
+
+---
+
+## Security Model Section Ownership
+
+| Section | Owner | Target Week |
+|---------|-------|-------------|
+| §1.1 Document Purpose | Mac | Week 4 |
+| §1.2 System Overview | Mac | Week 4 |
+| §2.1 In Scope | Albert | Week 4 |
+| §2.2 Out of Scope | Albert | Week 4 |
+| §3.1 Primary Use Case | Mac | Week 4 |
+| §3.2 Anti-Scenarios | Mac | Week 4 |
+| §4.1 External Libraries | Mac | ✅ Done |
+| §4.2 System Dependencies | Albert | Week 4 |
+| §5 Implementation Assumptions | Albert | ✅ Done |
+| §6.1 Administrator | Albert | ✅ Done |
+| §6.2 Authenticated Client | Mac | Week 4 |
+| §6.3 Storage Server | Albert | Week 4 |
+| §6.4 Untrusted Network | Mac | Week 4 |
+| §7.1 Client API | Albert | Week 4 |
+| §7.2 Inter-Server Communication | Albert | Week 4 |
+| §7.3 Storage Subsystem | Albert | Week 4 |
+| §8.1 Data Blocks | Mac | Week 5 |
+| §8.2 Erasure-Coded Fragments | Mac | Week 5 |
+| §8.3 Homomorphic Fingerprints | Mac | Week 5 |
+| §8.4 System Resources | Mac | Week 5 |
+| §9.1 DFD Component Descriptions | Albert | Week 5 |
+| §10.1 Spoofing | Mac | Week 6 |
+| §10.2 Tampering | Mac | Week 6 |
+| §10.3 Repudiation | Albert | Week 6 |
+| §10.4 Information Disclosure | Albert | Week 6 |
+| §10.5 Denial of Service | Joint | Week 6 |
+| §10.6 Elevation of Privilege | Joint | Week 6 |
+| §11.1 Spoofing Resolutions | Mac | Week 7 |
+| §11.2 Tampering Resolutions | Mac | Week 7 |
+| §11.3 Repudiation Resolutions | Albert | Week 7 |
+| §11.4 Information Disclosure Resolutions | Albert | Week 7 |
+| §11.5 DoS Resolutions | Joint | Week 7 |
+| §11.6 Elevation of Privilege Resolutions | Joint | Week 7 |
+| §12.1 Deployment Recommendations | Albert | Week 8 |
+| §12.2 Known Limitations | Mac | Week 8 |
+| §12.3 Integration Considerations | Mac | Week 8 |
+| §13.1 Security Test Suite | Mac | Week 8 |
+| §13.2 Code Review Process | Albert | Week 8 |
+| §13.3 Regression Testing | Albert | Week 8 |
+| §14.1 Review Schedule | Albert | Week 9 |
+| §14.2 Change Process | Albert | Week 9 |
+| §14.3 Version History | Joint | Week 9 |
 
 ---
 
