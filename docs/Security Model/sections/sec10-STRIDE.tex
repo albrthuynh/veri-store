@@ -1,0 +1,160 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Threat Analysis: STRIDE}
+
+% COMMENT: This section applies the STRIDE framework to systematically identify threats. For each
+% STRIDE category, list potential threats discovered during brainstorming. Express threats as
+% "Entity X performs action Y resulting in negative outcome Z". Don't worry about mitigations yet;
+% just document all potential threats. Each threat will be resolved in the next section.
+
+\subsection{Spoofing}
+
+% COMMENT: Threats where attackers pretend to be someone or something else. Examples: impersonating
+% legitimate clients, forging server identities, replaying old authentication tokens, masquerading
+% as storage servers to receive fragments. Consider both client-to-server and server-to-server
+% authentication.
+
+\subsubsection{S.1: Client Impersonation}
+
+% THREAT: An attacker impersonates a legitimate client and stores malicious data or retrieves
+% other users' data.
+
+\subsubsection{S.2: Server Impersonation}
+
+% THREAT: An attacker impersonates a storage server and receives fragments from clients, potentially
+% learning information about stored data.
+
+\subsubsection{S.3: Fingerprint Source Forgery}
+
+% THREAT: An attacker forges the source of fingerprints during cross-checksum verification,
+% causing servers to trust malicious fingerprint values.
+
+\subsection{Tampering}
+
+% COMMENT: Threats where attackers modify data in transit or at rest. Examples: corrupting
+% fragments in storage, modifying fragments in transit, tampering with fingerprints, altering
+% encoded data before distribution. Consider both accidental corruption and malicious modification.
+
+\subsubsection{T.1: Fragment Corruption in Storage}
+
+% THREAT: A malicious or compromised storage server modifies fragments at rest, causing data
+% corruption that will be detected only upon retrieval.
+
+\subsubsection{T.2: Fragment Modification in Transit}
+
+% THREAT: A network attacker intercepts and modifies fragments or fingerprints during transmission
+% between client and servers or between servers.
+
+\subsubsection{T.3: Fingerprint Tampering}
+
+% THREAT: An attacker modifies fingerprints to match corrupted fragments, bypassing integrity
+% verification.
+
+\subsubsection{T.4: Erasure Code Parameter Manipulation}
+
+% THREAT: An attacker manipulates encoding parameters (m, n, or field size) causing incorrect
+% encoding that appears valid but cannot be decoded.
+
+\subsection{Repudiation}
+
+% COMMENT: Threats where attackers perform actions that cannot be traced back to them. Examples:
+% storing data without audit trail, deleting fragments without logging, modifying data with no
+% accountability. This may be less critical for an academic prototype but should be considered
+% for production systems.
+
+\subsubsection{R.1: Anonymous Data Storage}
+
+% THREAT: An attacker stores large amounts of data without accountability, potentially consuming
+% storage resources or storing illegal content.
+
+\subsubsection{R.2: Fragment Deletion Without Logging}
+
+% THREAT: A compromised server deletes fragments without creating audit records, making it
+% impossible to trace data loss to specific servers.
+
+\subsubsection{R.3: Untrackable Verification Failures}
+
+% THREAT: When verification fails, the system cannot determine which server provided corrupted
+% data, allowing malicious servers to evade detection.
+
+\subsection{Information Disclosure}
+
+% COMMENT: Threats where attackers steal or learn sensitive information. Examples: reading
+% fragments from storage, inferring data patterns from fingerprints, eavesdropping on network
+% traffic, exploiting verbose error messages. Consider whether data confidentiality is in scope
+% or if encryption is assumed to be handled separately.
+
+\subsubsection{I.1: Fragment Eavesdropping}
+
+% THREAT: A network attacker intercepts fragments in transit and reconstructs the original block
+% if they capture at least m fragments.
+
+\subsubsection{I.2: Storage Server Data Access}
+
+% THREAT: A compromised storage server reads all fragments it stores, potentially learning
+% partial information about data blocks.
+
+\subsubsection{I.3: Fingerprint Analysis}
+
+% THREAT: An attacker analyzes fingerprints to infer information about data content, though
+% fingerprints are designed to reveal minimal information.
+
+\subsubsection{I.4: Error Message Information Leakage}
+
+% THREAT: Verbose error messages reveal internal system state, cryptographic parameters, or
+% fragment locations that could aid attacks.
+
+\subsection{Denial of Service}
+
+% COMMENT: Threats where attackers disrupt legitimate system operation. Examples: exhausting
+% storage capacity, flooding network with requests, corrupting fragments to make data unrecoverable,
+% causing expensive cryptographic operations. Consider both resource exhaustion and functional
+% denial of service.
+
+\subsubsection{D.1: Storage Exhaustion}
+
+% THREAT: An attacker stores excessive data, filling storage servers and preventing legitimate
+% users from storing data.
+
+\subsubsection{D.2: Fragment Unavailability}
+
+% THREAT: An attacker compromises more than n-m servers or corrupts more than n-m fragments,
+% making data unrecoverable.
+
+\subsubsection{D.3: Verification Flooding}
+
+% THREAT: An attacker triggers excessive verification operations, consuming CPU resources with
+% expensive finite field arithmetic and cryptographic operations.
+
+\subsubsection{D.4: Network Bandwidth Exhaustion}
+
+% THREAT: An attacker floods the network with fragment requests or verification messages,
+% preventing legitimate communication.
+
+\subsection{Elevation of Privilege}
+
+% COMMENT: Threats where attackers gain capabilities they are not authorized to have. Examples:
+% exploiting buffer overflows to execute arbitrary code, bypassing access controls, escalating
+% from client to server privileges. Consider both implementation vulnerabilities and design flaws.
+
+\subsubsection{E.1: Code Injection via Malformed Input}
+
+% THREAT: An attacker sends maliciously crafted fragments or fingerprints that exploit parsing
+% vulnerabilities, leading to arbitrary code execution on servers.
+
+\subsubsection{E.2: Verification Bypass}
+
+% THREAT: An attacker discovers a way to bypass fingerprint verification, allowing corrupted
+% fragments to be accepted as valid.
+
+\subsubsection{E.3: Cryptographic Parameter Override}
+
+% THREAT: An attacker manipulates system parameters (fingerprint size, field size, collision
+% probability) to weaken security and enable attacks.
+
+\subsubsection{E.4: Server-to-Server Privilege Escalation}
+
+% THREAT: A compromised storage server exploits inter-server protocols to gain control over
+% other servers or access fragments it should not have.
+\end{document}

@@ -1,0 +1,34 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Entry Points}
+
+% COMMENT: List all interfaces where external entities interact with veri-store. Each entry point
+% represents a potential attack surface. Group related operations into logical categories rather
+% than listing every API method. For each entry point, note its trust level and whether it sends
+% or receives data (or both). Examples: client API for store/retrieve, inter-server verification
+% protocol, storage subsystem file operations.
+
+\subsection{Client API}
+
+\begin{itemize}
+    \item \textbf{Store operation}: % Client submits data block for encoding and distribution
+    \item \textbf{Retrieve operation}: % Client requests data block reconstruction from fragments
+    \item \textbf{Verify operation}: % Client checks data integrity using fingerprints
+\end{itemize}
+
+\subsection{Inter-Server Communication}
+
+\begin{itemize}
+    \item \textbf{Fingerprint exchange}: % Servers share fingerprints for cross-checksum verification
+    \item \textbf{Fragment retrieval}: % Servers request fragments from peers for reconstruction
+\end{itemize}
+
+\subsection{Storage Subsystem}
+
+\begin{itemize}
+    \item \textbf{Fragment write}: % Store encoded fragment to local disk
+    \item \textbf{Fragment read}: % Retrieve fragment from local disk
+    \item \textbf{Fingerprint storage}: % Store/retrieve homomorphic fingerprints
+\end{itemize}
+\end{document}

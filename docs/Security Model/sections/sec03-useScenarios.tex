@@ -1,0 +1,25 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Use Scenarios}
+
+% COMMENT: Describe how veri-store will be deployed and used in practice. Include 3-5 concrete
+% deployment scenarios: e.g., local network deployment with 5 storage servers using 3-of-5
+% encoding, cloud deployment across multiple availability zones, research/academic usage for
+% testing erasure coding systems. Avoid marketing language; focus on operational details relevant
+% to security analysis.
+
+\subsection{Primary Use Case}
+
+% COMMENT: Describe the main expected usage: a client application storing data blocks across
+% multiple servers in a local network or cloud environment. Specify that clients can store,
+% retrieve, and verify data integrity. Note whether this is single-user or multi-user, whether
+% servers are trusted or semi-trusted, and what network environment is assumed (LAN vs Internet).
+
+\subsection{Anti-Scenarios}
+
+% COMMENT: List configurations or usage patterns that are explicitly unsupported or known to be
+% insecure. Examples: running storage servers on untrusted/compromised machines, using veri-store
+% for real-time/low-latency applications, storing unencrypted sensitive data (if encryption is
+% out of scope), relying on veri-store for availability guarantees beyond erasure coding provides.
+\end{document}

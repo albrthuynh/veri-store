@@ -1,0 +1,29 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Verification and Testing Plan}
+
+% COMMENT: Outline how you will verify that security mitigations are implemented correctly and
+% continue to work as the system evolves. This includes unit tests for security-critical code,
+% integration tests for security protocols, penetration testing, code review process, and
+% regression testing. Specify who is responsible for creating and maintaining security tests.
+
+\subsection{Security Test Suite}
+
+% COMMENT: Describe the automated test suite that will verify security properties. Tests should
+% cover: fingerprint collision resistance, detection of corrupted fragments, verification protocol
+% correctness, proper handling of malformed input. Each mitigated threat should have corresponding
+% tests.
+
+\subsection{Code Review Process}
+
+% COMMENT: Define the code review process for security-critical components. What criteria must
+% be met? Who performs reviews? Are there specific areas (fingerprinting, network protocol) that
+% require extra scrutiny?
+
+\subsection{Regression Testing}
+
+% COMMENT: Explain how you will prevent security regressions as the code evolves. Security tests
+% must be run on every commit. Design changes must trigger threat model review to ensure
+% assumptions remain valid.
+\end{document}

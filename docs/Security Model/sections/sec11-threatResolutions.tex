@@ -1,0 +1,199 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Threat Resolutions}
+
+% COMMENT: For each threat identified in the previous section, document its resolution. Classify
+% each threat as: (1) already mitigated by current design, (2) mitigated by dependency,
+% (3) requires mitigation, (4) dependency's responsibility, or (5) accepted risk. For mitigated
+% threats, describe the mitigation and assign testing to verify it. For unmitigated threats
+% requiring action, assign an owner and track to completion.
+
+\subsection{Spoofing Threat Resolutions}
+
+\subsubsection{S.1: Client Impersonation}
+\begin{itemize}
+\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
+\item \textbf{Resolution}: % Description of how this threat will be addressed
+\item \textbf{Owner}: % Person responsible for implementation/verification
+\item \textbf{Testing}: % How this mitigation will be verified
+\end{itemize}
+
+\subsubsection{S.2: Server Impersonation}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{S.3: Fingerprint Source Forgery}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsection{Tampering Threat Resolutions}
+
+\subsubsection{T.1: Fragment Corruption in Storage}
+\begin{itemize}
+\item \textbf{Status}: % Already mitigated by homomorphic fingerprint verification
+\item \textbf{Resolution}: % Cross-checksum protocol detects corrupted fragments
+\item \textbf{Owner}: %
+\item \textbf{Testing}: % Test suite injects corrupted fragments and verifies detection
+\end{itemize}
+
+\subsubsection{T.2: Fragment Modification in Transit}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{T.3: Fingerprint Tampering}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{T.4: Erasure Code Parameter Manipulation}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsection{Repudiation Threat Resolutions}
+
+\subsubsection{R.1: Anonymous Data Storage}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{R.2: Fragment Deletion Without Logging}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{R.3: Untrackable Verification Failures}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsection{Information Disclosure Threat Resolutions}
+
+\subsubsection{I.1: Fragment Eavesdropping}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{I.2: Storage Server Data Access}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{I.3: Fingerprint Analysis}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{I.4: Error Message Information Leakage}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsection{Denial of Service Threat Resolutions}
+
+\subsubsection{D.1: Storage Exhaustion}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{D.2: Fragment Unavailability}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{D.3: Verification Flooding}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{D.4: Network Bandwidth Exhaustion}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsection{Elevation of Privilege Threat Resolutions}
+
+\subsubsection{E.1: Code Injection via Malformed Input}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{E.2: Verification Bypass}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{E.3: Cryptographic Parameter Override}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+
+\subsubsection{E.4: Server-to-Server Privilege Escalation}
+\begin{itemize}
+\item \textbf{Status}: %
+\item \textbf{Resolution}: %
+\item \textbf{Owner}: %
+\item \textbf{Testing}: %
+\end{itemize}
+\end{document}

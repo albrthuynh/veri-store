@@ -1,0 +1,36 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Protected Assets}
+
+% COMMENT: Identify all resources that must be protected from harm. These are the things an
+% attacker will try to steal, modify, or disrupt. For each asset, specify what trust levels
+% should have access to it and what properties must be maintained (confidentiality, integrity,
+% availability). Examples: original data blocks, erasure-coded fragments, homomorphic fingerprints,
+% cryptographic keys (if used), server resources (CPU, memory, disk).
+
+\subsection{Data Blocks}
+
+% COMMENT: Original data blocks submitted by clients. Primary security concern is integrity:
+% ensuring retrieved data matches what was stored. Confidentiality may be out of scope if
+% encryption is handled separately. Availability depends on having at least m of n fragments
+% available.
+
+\subsection{Erasure-Coded Fragments}
+
+% COMMENT: Individual fragments stored on servers. Must maintain integrity to ensure correct
+% reconstruction. Fragment authenticity is verified via homomorphic fingerprints. Loss of fewer
+% than n-m fragments should not compromise data availability.
+
+\subsection{Homomorphic Fingerprints}
+
+% COMMENT: Compact cryptographic checksums that preserve erasure code structure. Critical for
+% integrity verification. Must be protected from tampering and forgery. Fingerprints themselves
+% don't reveal data content but must be authentic.
+
+\subsection{System Resources}
+
+% COMMENT: Server computational resources (CPU, memory, disk space, network bandwidth). Attackers
+% should not be able to exhaust these resources and cause denial of service. Resource consumption
+% should be proportional to legitimate usage.
+\end{document}

@@ -1,0 +1,50 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Dependencies}
+
+% COMMENT: Enumerate all external libraries, systems, and services that veri-store relies upon.
+% For each dependency, note what functionality it provides and what security assumptions you're
+% making about it. Examples: Python standard library, galois/pyfinite for finite field arithmetic,
+% numpy for array operations, network stack (TCP/IP), file system for local storage.
+
+\subsection{External Libraries}
+
+\subsubsection*{Mathematical operations and erasure coding}
+\begin{itemize}
+    \item \texttt{\textbf{galois} [$\geq$ v0.3.8]}: Finite field arithmetic over $\mathbb{F}_{256}$
+    \item \texttt{\textbf{numpy} [$\geq$ v1.26.0]}: Array operations and polynomial manipulation
+\end{itemize}
+
+\subsubsection*{Web framework}
+\begin{itemize}
+    \item \texttt{\textbf{fastapi} [$\geq$ v0.110.0]}: REST API for client-server communication
+    \item \texttt{\textbf{uvicorn} [$\geq$ v0.29.0]}: ASGI server for hosting the API
+\end{itemize}
+
+\subsubsection*{HTTP client}
+\begin{itemize}
+    \item \texttt{\textbf{httpx} [$\geq$ v0.27.0]}: For inter-server communication and fragment distribution
+\end{itemize}
+
+\subsubsection*{API data validation}
+\begin{itemize}
+    \item \texttt{\textbf{pydantic} [$\geq$ v2.6.0]}: Data validation and parsing for API requests/responses
+\end{itemize}
+
+\subsubsection*{Testing}
+\begin{itemize}
+    \item \texttt{\textbf{pytest} [$\geq$ v8.0.0]}: For running unit and integration tests
+    \begin{itemize}
+        \item \texttt{\textbf{pytest-asyncio} [$\geq$ v0.23.0]}: For testing asynchronous code paths
+    \end{itemize}
+\end{itemize}
+
+\subsection{System Dependencies}
+
+\begin{itemize}
+    \item \textbf{Network stack}: % TCP/IP for inter-server communication
+    \item \textbf{File system}: % Local storage of fragments
+    \item \textbf{Operating system}: % Process isolation, memory protection
+\end{itemize}
+\end{document}

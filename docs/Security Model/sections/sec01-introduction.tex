@@ -1,0 +1,26 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Introduction}
+
+% COMMENT: This section provides an overview of the veri-store system and the purpose of this
+% security model. Describe the system as a distributed erasure-coded object storage system with
+% homomorphic fingerprint verification. State that this is a living document that will evolve as
+% the system is developed. Mention that this model follows the threat modeling approach outlined
+% by Torr (Microsoft, 2005).
+
+\subsection{Document Purpose}
+
+% COMMENT: Explain that this document serves as the security foundation for the veri-store project.
+% It will be used to identify threats, design mitigations, and verify security properties throughout
+% the development lifecycle. Note that this is version 0.1 and will be updated as components are
+% implemented and new threats are discovered.
+
+\subsection{System Overview}
+
+% COMMENT: Provide a 3-5 sentence high-level description of veri-store: a distributed storage
+% system that splits data blocks into fragments using Reed-Solomon erasure coding (m-of-n),
+% distributes fragments across multiple servers, and uses homomorphic fingerprints to verify
+% fragment integrity without reconstructing the full block. Mention the key security goal:
+% ensuring data integrity and authenticity in a potentially adversarial distributed environment.
+\end{document}

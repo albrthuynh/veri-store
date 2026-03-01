@@ -1,0 +1,19 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Implementation Assumptions}
+
+% COMMENT: List all assumptions made during design and development that must be verified later.
+% These help scope the threat model and identify areas where assumptions might be invalid.
+% Examples: servers do not collude beyond f failures, network provides reliable delivery,
+% cryptographic primitives (if used) are secure, finite field arithmetic is correctly implemented,
+% fragment storage is atomic.
+
+\begin{itemize}
+    \item At most $f$ out of $n$ total servers may be compromised or fail and the system will still maintain data integrity
+    \item Network communication channels are/will be authenticated
+    \item Storage servers have sufficient disk space for fragments of size $1/m$ of original block
+    \item Homomorphic fingerprint collision probability is negligible
+    \item Erasure coding library correctly implements Reed-Solomon
+\end{itemize}
+\end{document}

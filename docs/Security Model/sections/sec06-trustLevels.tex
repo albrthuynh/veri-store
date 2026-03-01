@@ -1,0 +1,48 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Trust Levels}
+
+% COMMENT: Define the hierarchy of trust levels in the system. For each trust level, describe
+% what entities operate at that level and what capabilities/privileges they have. In distributed
+% systems, this often includes: system administrator, authenticated client, storage server,
+% untrusted network attacker. Note that some components may operate at different trust levels
+% depending on deployment scenario.
+
+\subsection{Administrator}
+
+% COMMENT: Describe the system administrator trust level. This includes anyone with physical or
+% root access to the servers. Administrators have complete control over the system and can read,
+% modify, or delete any data. Security model assumes administrators are trusted and benign.
+System administrators have full access to the servers hosting the veri-store system and the stored data. They are responsible for maintaining the infrastructure, applying updates, and ensuring the system is running smoothly. The security model assumes that administrators are trusted and will not intentionally compromise data integrity or confidentiality. However, they have the capability to access stored fragments and fingerprints, so it is important to consider this trust level when designing mitigations for information disclosure threats.
+\vspace{1em}
+
+\noindent Example System Administrators:
+\begin{itemize}
+    \item Developers (e.g., Albert and Mac) during development and testing
+    \item IT staff responsible for server/data maintenance in a production deployment
+    \item Cloud provider administrators if deployed on cloud infrastructure (e.g., AWS, Azure)
+    \item System operators with root access to physical or virtual servers
+    \item \textit{Additional examples to be added}
+\end{itemize}
+
+\subsection{Authenticated Client}
+
+% COMMENT: Describe clients who have authenticated to the system and are authorized to store/retrieve
+% data. These users are assumed to be legitimate but may make mistakes or run buggy software.
+% They should not be able to corrupt other users' data or violate system integrity.
+
+\subsection{Storage Server}
+
+% COMMENT: Describe the trust level of storage servers. In the semi-trusted model, servers might
+% fail, return corrupted data, or attempt to forge fingerprints, but do not actively collude
+% (beyond the f-threshold). Specify whether servers are assumed to follow protocols correctly or
+% might exhibit Byzantine behavior.
+
+\subsection{Untrusted Network}
+
+% COMMENT: Describe the untrusted network attacker model. This includes any adversary who can
+% observe, modify, or inject network traffic between clients and servers or between servers.
+% Network attackers cannot compromise server storage but can manipulate messages in transit.
+% Specify whether you assume network authentication (TLS) or if that's future work.
+\end{document}

@@ -1,0 +1,97 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Data Flow Diagram}
+
+% COMMENT: This section contains the graphical representation of data flows through veri-store.
+% The DFD shows all major components, entry points, data stores, and how information moves
+% between them. Use different colors for trust levels: green for trusted processes, red for
+% untrusted entities/data, orange for semi-trusted. Number all data flows sequentially and label
+% them with concise descriptions.
+
+\begin{figure}[ht!]
+\centering
+\begin{tikzpicture}[node distance=2.5cm]
+
+% External entities
+\node (client) [entity, fill=trusted!30] {Client};
+\node (network) [entity, fill=untrusted!30, right of=client, xshift=3cm] {Network};
+\node (storage) [datastore, fill=semitrusted!30, below of=network, yshift=-1cm] {Fragment \newline Storage};
+
+% Processes (all trusted - our code)
+\node (encode) [process, below of=client, yshift=-0.5cm] {Encode \newline Block};
+\node (fingerprint) [process, right of=encode, xshift=2cm] {Compute \newline Fingerprint};
+\node (distribute) [process, below of=fingerprint, yshift=-0.5cm] {Distribute \newline Fragments};
+\node (verify) [process, below of=distribute, yshift=-0.5cm] {Verify \newline Fragments};
+\node (reconstruct) [process, left of=verify, xshift=-2cm] {Reconstruct \newline Block};
+
+% Data flows
+\draw [arrow] (client) -- node[anchor=east] {1. Data block} (encode);
+\draw [arrow] (encode) -- node[anchor=south] {2. Fragments} (fingerprint);
+\draw [arrow] (fingerprint) -- node[anchor=west] {3. Fingerprints} (distribute);
+\draw [arrow] (distribute) -- node[anchor=west] {4. Fragment + \newline fingerprint} (network);
+\draw [arrow] (network) -- node[anchor=west] {5. Store} (storage);
+\draw [arrow] (storage) -- node[anchor=east] {6. Retrieve} (verify);
+\draw [arrow] (verify) -- node[anchor=south] {7. Verified \newline fragments} (reconstruct);
+\draw [arrow] (reconstruct) -- node[anchor=east] {8. Reconstructed \newline block} (client);
+
+% Cross-checksum verification (dotted line to show verification flow)
+\draw [arrow, dashed] (storage) to[bend left=30] node[anchor=west] {9. Cross-check \newline fingerprints} (verify);
+
+\end{tikzpicture}
+\caption{High-level data flow diagram for veri-store store and retrieve operations.}
+\label{fig:dfd}
+\end{figure}
+
+\subsection{DFD Component Descriptions}
+
+% COMMENT: Provide brief descriptions of each component in the DFD. Explain what each process
+% does, what trust level it operates at, and what security properties it maintains. Describe
+% external entities and data stores. Note any assumptions about data flows (e.g., authenticated
+% channels, encrypted storage).
+
+\subsubsection{Client}
+
+% COMMENT: External entity representing the user or application storing/retrieving data. Operates
+% at "authenticated client" trust level. Assumed to be benign but may have bugs.
+
+\subsubsection{Encode Block}
+
+% COMMENT: Trusted process that implements Reed-Solomon erasure coding. Takes original block,
+% produces n fragments such that any m can reconstruct the original. Must correctly implement
+% the encoding algorithm to ensure fragments are valid.
+
+\subsubsection{Compute Fingerprint}
+
+% COMMENT: Trusted process that generates homomorphic fingerprints for each fragment using division
+% fingerprinting over F_256. Must use cryptographically secure random parameter r and correctly
+% compute fingerprints to ensure collision resistance.
+
+\subsubsection{Distribute Fragments}
+
+% COMMENT: Trusted process that sends fragments and fingerprints to storage servers. Handles
+% network communication and retries. May need to authenticate servers to prevent MITM attacks.
+
+\subsubsection{Network}
+
+% COMMENT: Untrusted external entity representing network infrastructure. Adversary may observe,
+% modify, or inject messages. Protection via authentication (TLS) or message authentication codes
+% may be needed.
+
+\subsubsection{Fragment Storage}
+
+% COMMENT: Semi-trusted data store representing persistent storage on servers. Stores fragments
+% and fingerprints. Servers may fail or return corrupted data but are detected via verification.
+% Storage is assumed to be persistent but not necessarily confidential.
+
+\subsubsection{Verify Fragments}
+
+% COMMENT: Trusted process that validates fragment integrity using homomorphic fingerprints.
+% Retrieves fragments and fingerprints from storage, performs cross-checksum verification to
+% detect corrupted or forged fragments. Rejects invalid fragments.
+
+\subsubsection{Reconstruct Block}
+
+% COMMENT: Trusted process that decodes original block from m valid fragments using Reed-Solomon
+% decoding. Only operates on verified fragments to ensure integrity of reconstructed data.
+\end{document}
