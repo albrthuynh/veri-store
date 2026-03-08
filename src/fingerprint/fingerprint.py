@@ -18,6 +18,7 @@ References:
 """
 
 from __future__ import annotations
+import hashlib
 from .field import GF256
 from .polynomial import Polynomial
 
@@ -38,9 +39,8 @@ def fingerprint(r: GF256, data: bytes) -> GF256:
     Returns:
         A GF256 element representing the fingerprint.
     """
-    # TODO: 1. Build Polynomial.from_bytes(data)
-    # TODO: 2. Return poly.evaluate(r)
-    ...
+    poly = Polynomial.from_bytes(data)
+    return poly.evaluate(r)
 
 
 def random_point(seed: bytes) -> GF256:
@@ -57,11 +57,17 @@ def random_point(seed: bytes) -> GF256:
     Returns:
         A GF256 element to use as the fingerprint evaluation point.
     """
-    # TODO: 1. Compute SHA-256(seed)
-    # TODO: 2. Take the first byte of the digest as the field element.
-    # TODO: Note: Using only 1 byte gives q=256 and a collision probability
-    #       of 1/256 per check (Theorem 3.4).  Document this clearly.
-    ...
+    counter = 0
+
+    while True:
+        # Hash the seed with a counter to get a pseudorandom stream of bytes
+        digest = hashlib.sha256(seed + counter.to_bytes(4, 'big')).digest()
+        r = GF256(digest[0])  # Take the first byte as the candidate point
+
+        if r.value != 0:  # Avoid zero since it would make fp(r, d) = d(0) = c0
+            return r
+
+        counter += 1  # Increment counter and try again if we got zero
 
 
 def verify_homomorphic_property(
@@ -89,7 +95,15 @@ def verify_homomorphic_property(
     Raises:
         ValueError: If data1 and data2 have different lengths.
     """
-    # TODO: 1. Compute the fingerprint of the linear combination on the left.
-    # TODO: 2. Compute the linear combination of fingerprints on the right.
-    # TODO: 3. Return left == right.
-    ...
+    if len(data1) != len(data2):
+        raise ValueError("data1 and data2 must have the same length")
+
+    a, b = coefficients
+    combined = bytes(
+        (a * GF256(x) + b * GF256(y)).value
+        for x, y in zip(data1, data2)
+    )
+
+    left = fingerprint(r, combined)
+    right = (a * fingerprint(r, data1)) + (b * fingerprint(r, data2))
+    return left == right

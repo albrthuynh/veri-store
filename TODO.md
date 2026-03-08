@@ -53,10 +53,10 @@
 
 #### Mac (Security/Software Engineering)
 
-- [ ] Implement division fingerprinting (Theorem 2.3)
-- [ ] Implement `fp(r, d)` function: data → fingerprint
-- [ ] Verify homomorphic properties (fp(r,d₁+d₂) = fp(r,d₁) + fp(r,d₂))
-- [ ] Write comprehensive unit tests for fingerprinting
+- [X] Implement division fingerprinting (Theorem 2.3)
+- [X] Implement `fp(r, d)` function: data → fingerprint
+- [X] Verify homomorphic properties (fp(r,d₁+d₂) = fp(r,d₁) + fp(r,d₂))
+- [X] Write comprehensive unit tests for fingerprinting
 
 #### Albert (Systems/Backend)
 
