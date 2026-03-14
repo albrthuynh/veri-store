@@ -119,7 +119,7 @@ class FingerprintedCrossChecksum:
         n = json_dict["n"]
         m = json_dict["m"]
 
-        return FingerprintedCrossChecksum(hashes, fingerprints, r, n, m)
+        return cls(hashes, fingerprints, r, n, m)
 
     def digest(self) -> str:
         """Return a hex digest of the canonical JSON representation.
