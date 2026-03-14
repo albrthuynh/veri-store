@@ -18,7 +18,8 @@ References:
 """
 
 from __future__ import annotations
-import hashlib
+
+from src.verification.oracle import RandomOracle
 from .field import GF256
 from .polynomial import Polynomial
 
@@ -61,7 +62,7 @@ def random_point(seed: bytes) -> GF256:
 
     while True:
         # Hash the seed with a counter to get a pseudorandom stream of bytes
-        digest = hashlib.sha256(seed + counter.to_bytes(4, 'big')).digest()
+        digest = RandomOracle.hash_fragment(seed + counter.to_bytes(4, 'big'))
         r = GF256(digest[0])  # Take the first byte as the candidate point
 
         if r.value != 0:  # Avoid zero since it would make fp(r, d) = d(0) = c0
