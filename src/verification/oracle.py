@@ -13,10 +13,10 @@ concatenated fragment hashes.  This gives r in GF(2^8) = {0, ..., 255}.
 The collision probability for any single verification check is at most 1/q
 where q = 256 = |GF(2^8)|.  See Theorem 3.4 in the paper.
 """
-
 from __future__ import annotations
-from ..fingerprint.field import GF256
+import hashlib
 
+from ..fingerprint.field import GF256
 
 class RandomOracle:
     """Deterministic random oracle mapping fragment-hash vectors to GF(2^8).
@@ -39,10 +39,18 @@ class RandomOracle:
         Raises:
             ValueError: If fragment_hashes is empty.
         """
-        # TODO: 1. Concatenate all fragment hash bytes in order.
-        # TODO: 2. Compute SHA-256 of the concatenation.
-        # TODO: 3. Return GF256(digest[0]).
-        ...
+        if not fragment_hashes:
+            raise ValueError("fragment_hashes cannot be empty")
+
+        counter = 0
+        concatenated = b''.join(fragment_hashes)
+        
+        while True:
+            digest = RandomOracle.hash_fragment(concatenated + counter.to_bytes(4, 'big'))
+            r = GF256(digest[0])  # Take the first byte as the candidate point
+            if r.value != 0: 
+                return r
+            counter += 1
 
     @staticmethod
     def hash_fragment(fragment_data: bytes) -> bytes:
@@ -54,5 +62,4 @@ class RandomOracle:
         Returns:
             A 32-byte SHA-256 digest.
         """
-        # TODO: return hashlib.sha256(fragment_data).digest()
-        ...
+        return hashlib.sha256(fragment_data).digest()
