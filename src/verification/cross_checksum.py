@@ -22,8 +22,11 @@ the hashes before any verification step to prevent tampering.
 from __future__ import annotations
 import json
 from dataclasses import dataclass
+
 from ..fingerprint.field import GF256
+from ..fingerprint.fingerprint import fingerprint, random_point
 from ..erasure.encoder import Fragment
+from .oracle import RandomOracle
 
 
 @dataclass
@@ -58,11 +61,21 @@ class FingerprintedCrossChecksum:
         Raises:
             ValueError: If `fragments` is empty or not sorted by index.
         """
-        # TODO: 1. Compute h_i = RandomOracle.hash_fragment(f.data) for each f.
-        # TODO: 2. Derive r = RandomOracle.derive(hashes).
-        # TODO: 3. Compute phi_j = fingerprint(r, fragments[j].data) for j < m.
-        # TODO: 4. Return FingerprintedCrossChecksum(hashes, fingerprints, r, n, m).
-        ...
+
+        if not fragments:
+            raise ValueError("fragments cannot be empty")
+        for i, f in enumerate(fragments):
+            if f.index != i:
+                raise ValueError(f"fragments must be in index order with no gaps. Fragment at position {i} has index {f.index}.")
+
+        hashes = [RandomOracle.hash_fragment(f.data) for f in fragments]
+        r = RandomOracle.derive(hashes)
+        n = len(fragments)
+        m = fragments[0].threshold_m
+        fingerprints = [fingerprint(r, fragments[j].data) for j in range(0, m)]
+
+        return FingerprintedCrossChecksum(hashes, fingerprints, r, n, m)
+        
 
     # ------------------------------------------------------------------
     # Serialization
@@ -74,8 +87,20 @@ class FingerprintedCrossChecksum:
         Returns:
             A JSON string encoding all fields.
         """
-        # TODO: Convert bytes to hex, GF256 to int, then json.dumps.
-        ...
+
+        hashes_json = [h.hex() for h in self.hashes]
+        fingerprints_json = [fp.value for fp in self.fingerprints]
+        r_json = self.r.value
+
+        json_dict = {
+            "hashes": hashes_json,
+            "fingerprints": fingerprints_json,
+            "r": r_json,
+            "n": self.n,
+            "m": self.m
+        }
+
+        return json.dumps(json_dict)
 
     @classmethod
     def from_json(cls, json_str: str) -> FingerprintedCrossChecksum:
@@ -87,8 +112,14 @@ class FingerprintedCrossChecksum:
         Returns:
             A FingerprintedCrossChecksum instance.
         """
-        # TODO: json.loads, convert hex -> bytes, int -> GF256.
-        ...
+        json_dict = json.loads(json_str)
+        hashes = [bytes.fromhex(h) for h in json_dict["hashes"]]
+        fingerprints = [GF256(fp) for fp in json_dict["fingerprints"]]
+        r = GF256(json_dict["r"])
+        n = json_dict["n"]
+        m = json_dict["m"]
+
+        return FingerprintedCrossChecksum(hashes, fingerprints, r, n, m)
 
     def digest(self) -> str:
         """Return a hex digest of the canonical JSON representation.
@@ -98,5 +129,4 @@ class FingerprintedCrossChecksum:
         Returns:
             A hex string (SHA-256 of the canonical JSON).
         """
-        # TODO: return hashlib.sha256(self.to_json().encode()).hexdigest()
-        ...
+        return RandomOracle.hash_fragment(self.to_json().encode()).hex()
