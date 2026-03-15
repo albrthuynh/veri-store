@@ -3,24 +3,17 @@
 \begin{document}
 \section{Introduction}
 
-% COMMENT: This section provides an overview of the veri-store system and the purpose of this
-% security model. Describe the system as a distributed erasure-coded object storage system with
-% homomorphic fingerprint verification. State that this is a living document that will evolve as
-% the system is developed. Mention that this model follows the threat modeling approach outlined
-% by Torr (Microsoft, 2005).
-
 \subsection{Document Purpose}
 
-% COMMENT: Explain that this document serves as the security foundation for the veri-store project.
-% It will be used to identify threats, design mitigations, and verify security properties throughout
-% the development lifecycle. Note that this is version 0.1 and will be updated as components are
-% implemented and new threats are discovered.
+This document will be used to identify threats, design mitigations, and verify the security properties of the Veri-Store system throughout the development lifecycle. It will be updated as components are implemented and new threats are discovered. 
 
 \subsection{System Overview}
 
-% COMMENT: Provide a 3-5 sentence high-level description of veri-store: a distributed storage
-% system that splits data blocks into fragments using Reed-Solomon erasure coding (m-of-n),
-% distributes fragments across multiple servers, and uses homomorphic fingerprints to verify
-% fragment integrity without reconstructing the full block. Mention the key security goal:
-% ensuring data integrity and authenticity in a potentially adversarial distributed environment.
+Veri-Store is a distributed file storage system built using 3-of-5 Reed-Solomon erasure coding. It splits a single data block into 5 fragments in such a way that the original block of data can be built with only 3 of the original fragments. 
+
+The main security concerns are (a) ensuring integrity of the fragments and (b) ensuring that a fragment belongs to the data block being reconstructed. If a fragment has been tampered with (integrity) or was not part of the original block (authenticity), but data block construction goes forward anyway, an adversary could inject malicious code into the system.
+
+Veri-Store addresses these concerns using homomorphic fingerprinting, allowing each fragment to be indepently verified on their respective servers as belonging to the correct data block without needing to reconstruct the full block.
+
+\newpage
 \end{document}
