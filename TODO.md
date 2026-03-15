@@ -80,13 +80,13 @@
 - [X] Given fragment dᵢ and fpcc, verify consistency (Definition 3.3)
 - [X] Handle verification failures gracefully (log errors, reject fragments)
 - [X] Write tests for Byzantine fault detection
-- [x] **Security Model §4.1:** External Libraries — documented
-- [ ] **Security Model §1.1:** Write Document Purpose
-- [ ] **Security Model §1.2:** Write System Overview
-- [ ] **Security Model §3.1:** Write Primary Use Case
-- [ ] **Security Model §3.2:** Write Anti-Scenarios
-- [ ] **Security Model §6.2:** Write Authenticated Client trust level
-- [ ] **Security Model §6.4:** Write Untrusted Network trust level
+- [X] **Security Model §4.1:** External Libraries — documented
+- [X] **Security Model §1.1:** Write Document Purpose
+- [X] **Security Model §1.2:** Write System Overview
+- [X] **Security Model §3.1:** Write Primary Use Case
+- [X] **Security Model §3.2:** Write Anti-Scenarios
+- [X] **Security Model §6.2:** Write Authenticated Client trust level
+- [X] **Security Model §6.4:** Write Untrusted Network trust level
 
 #### Albert (Systems/Backend)
 
