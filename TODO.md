@@ -77,8 +77,8 @@
 #### Mac (Security/Software Engineering)
 
 - [X] Implement fragment verification logic on server side
-- [ ] Given fragment dᵢ and fpcc, verify consistency (Definition 3.3)
-- [ ] Handle verification failures gracefully (log errors, reject fragments)
+- [X] Given fragment dᵢ and fpcc, verify consistency (Definition 3.3)
+- [X] Handle verification failures gracefully (log errors, reject fragments)
 - [ ] Write tests for Byzantine fault detection
 - [x] **Security Model §4.1:** External Libraries — documented
 - [ ] **Security Model §1.1:** Write Document Purpose
