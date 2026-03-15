@@ -27,10 +27,9 @@ System administrators have full access to the servers hosting the veri-store sys
 \end{itemize}
 
 \subsection{Authenticated Client}
+The term ``authenticated client'' refers both to the end users and the application they use to access the Veri-Store system.
 
-% COMMENT: Describe clients who have authenticated to the system and are authorized to store/retrieve
-% data. These users are assumed to be legitimate but may make mistakes or run buggy software.
-% They should not be able to corrupt other users' data or violate system integrity.
+An authenticated client has verified their identity to the system and is authorized to store and retrieve their own data. They are assumed to be legitimate, but may make mistakes or run buggy software which can violate system security. They should not have access to other users' data or have the ability to violate system integrity.
 
 \subsection{Storage Server}
 
@@ -40,11 +39,11 @@ System administrators have full access to the servers hosting the veri-store sys
 % might exhibit Byzantine behavior.
 
 \subsection{Untrusted Network}
+We assume a TLS connection between clients and servers, although we do not rely on it for data integrity. Adversaries will be able to observe network traffic, and it is assumed that they will, in theory, be able to inject network traffic. 
 
-% COMMENT: Describe the untrusted network attacker model. This includes any adversary who can
-% observe, modify, or inject network traffic between clients and servers or between servers.
-% Network attackers cannot compromise server storage but can manipulate messages in transit.
-% Specify whether you assume network authentication (TLS) or if that's future work.
+However, the homomorphic fingerprinting scheme allows for any inconsistencies between data fragments to be caught before reconstruction.  Any tampering will be detected because the tampered fragment's fingerprint won't match the expected encoding of the other fragments' fingerprints. In order to not be caught, an adversary would need to provide a consistent set of tampered fragments which all pass verification. This is computationally infeasible given the collision resistance of the fingerprinting scheme.
+
+Unfortunately, given the material constraints of this project (i.e., ``servers'' existing on a single machine as different \texttt{localhost} ports), we are unable to fully test this.
 
 \newpage
 \end{document}
