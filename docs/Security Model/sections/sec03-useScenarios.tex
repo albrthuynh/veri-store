@@ -2,31 +2,30 @@
 
 \begin{document}
 \section{Use Scenarios}
-
-% COMMENT: Describe how veri-store will be deployed and used in practice. Include 3-5 concrete
-% deployment scenarios: e.g., local network deployment with 5 storage servers using 3-of-5
-% encoding, cloud deployment across multiple availability zones, research/academic usage for
-% testing erasure coding systems. Avoid marketing language; focus on operational details relevant
-% to security analysis.
-
 We expect a number of possible use cases of the Veri-Store system, given in the non-exhaustive list below:
+
 \begin{itemize}
-    \item
+    \item Intranet for an organization, providing remote access to documents and files to organization members.
+    \item Academic research and testing for erasure coding systems.
+    \item Static asset distribution across geographically dispersed servers.
+    \item Medical records storage, providing both fault tolerance and tamper detection needed for legal compliance.
+    \item Archival storage for organizations that need redundancy without the cost of full replication.
 \end{itemize}
 
 \subsection{Primary Use Case}
+Users will access Veri-Store through a client application, using it to store files which can be accessed later from the network. The client application can store data, retrieve files, verify integrity, and reconstruct the original data block. We will start with a single-user application (akin to a flash drive over the network), with hopes to move Veri-Store to a multi-user system where files can be shared.
 
-% COMMENT: Describe the main expected usage: a client application storing data blocks across
-% multiple servers in a local network or cloud environment. Specify that clients can store,
-% retrieve, and verify data integrity. Note whether this is single-user or multi-user, whether
-% servers are trusted or semi-trusted, and what network environment is assumed (LAN vs Internet).
+The servers in this use case are to be semi-trusted - we assume that adversaries will attempt to tamper with data fragments if they are able to break into the system. (See Section 6 for a formal discussion of trust levels.) Although a network environment (both LAN and public internet) is the goal, for the sake of this project, we will be hosting each "server" on a single machine through different \texttt{localhost} ports.
 
 \subsection{Anti-Scenarios}
+The following use cases are unsupported and/or known to be insecure:
 
-% COMMENT: List configurations or usage patterns that are explicitly unsupported or known to be
-% insecure. Examples: running storage servers on untrusted/compromised machines, using veri-store
-% for real-time/low-latency applications, storing unencrypted sensitive data (if encryption is
-% out of scope), relying on veri-store for availability guarantees beyond erasure coding provides.
+\begin{itemize}
+    \item Running servers on machines which are wholly untrusted or known to be compromised.
+    \item Applications with strict latency requirements. Erasure coding and fragment verification introduce non-trivial computational overhead.
+    \item Unencrypted sensitive data - Veri-Store is not an encryption scheme. Sensitive data should be encrypted before being given to Veri-Store.
+    \item We cannot guarantee availability if more than 2 of the 5 servers are unavailable.
+\end{itemize}
 
 \newpage
 \end{document}
