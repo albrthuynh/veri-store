@@ -2,7 +2,7 @@
 
 ## 10-Week Timeline
 
-### Week 1: Foundation & Setup
+### Week 1: Foundation & Setup (M 2/9-F 2/13)
 
 #### Mac (Security/Software Engineering)
 
@@ -26,7 +26,7 @@
 
 ---
 
-### Week 2: Core Primitives
+### Week 2: Core Primitives (M 2/16-F 2/20)
 
 #### Mac (Security/Software Engineering)
 
@@ -49,7 +49,7 @@
 
 ---
 
-### Week 3: Fingerprinting Implementation
+### Week 3: Fingerprinting Implementation (M 2/23-F 2/27)
 
 #### Mac (Security/Software Engineering)
 
@@ -72,7 +72,7 @@
 
 ---
 
-### Week 4: Server Infrastructure
+### Week 4: Server Infrastructure (M 3/2-F 3/6)
 
 #### Mac (Security/Software Engineering)
 
@@ -112,7 +112,7 @@
 
 ---
 
-### Week 5: Client Implementation
+### Week 5: Client Implementation (M 3/9-F 3/13)
 
 #### Mac (Security/Software Engineering)
 
@@ -143,7 +143,7 @@
 
 ---
 
-### Week 6: Fault Tolerance
+### Week 6: Fault Tolerance (M 3/16-F 3/20)
 
 #### Mac (Security/Software Engineering)
 
@@ -174,7 +174,7 @@
 
 ---
 
-### Week 7: HTTP API Refinement
+### Week 7: HTTP API Refinement (M 3/23-F 3/27) [SPRING BREAK]
 
 #### Mac (Security/Software Engineering)
 
@@ -205,7 +205,7 @@
 
 ---
 
-### Week 8: Testing & Validation
+### Week 8: Testing & Validation (M 3/30-F 4/3)
 
 #### Mac (Security/Software Engineering)
 
@@ -236,7 +236,7 @@
 
 ---
 
-### Week 9: Performance & Documentation
+### Week 9: Performance & Documentation (M 4/6-F 4/10)
 
 #### Mac (Security/Software Engineering)
 
@@ -267,7 +267,7 @@
 
 ---
 
-### Week 10: Demo Preparation & Final Touches
+### Week 10: Demo Preparation & Final Touches (M 4/13-F 4/17)
 
 #### Mac (Security/Software Engineering)
 
