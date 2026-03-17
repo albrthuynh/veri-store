@@ -42,11 +42,11 @@
 \end{itemize}
 
 \subsection{System Dependencies}
-
+Veri-store also depends on the underlying platform. We treat these as given and do not try to secure them ourselves:
 \begin{itemize}
-    \item \textbf{Network stack}: % TCP/IP for inter-server communication
-    \item \textbf{File system}: % Local storage of fragments
-    \item \textbf{Operating system}: % Process isolation, memory protection
+    \item \textbf{Network stack}: We assume a working TCP/IP stack that can deliver HTTP requests between clients and servers. Attacks on routing or congestion control are out of scope.
+    \item \textbf{File system}: We rely on the local file system to store fragment files and metadata. We assume basic guarantees such as ``writes that complete are durable'' and that file permissions are configured correctly by the operator.
+    \item \textbf{Operating system}: We assume the OS provides process isolation, memory protection, and a reasonably bug-free implementation of standard syscalls. Kernel-level exploits and privilege escalation are not modeled here.
 \end{itemize}
 
 \newpage

@@ -20,6 +20,7 @@ References:
 from __future__ import annotations
 
 from src.verification.oracle import RandomOracle
+
 from .field import GF256
 from .polynomial import Polynomial
 
@@ -61,14 +62,13 @@ def random_point(seed: bytes) -> GF256:
     counter = 0
 
     while True:
-        # Hash the seed with a counter to get a pseudorandom stream of bytes
-        digest = RandomOracle.hash_fragment(seed + counter.to_bytes(4, 'big'))
-        r = GF256(digest[0])  # Take the first byte as the candidate point
+        digest = RandomOracle.hash_fragment(seed + counter.to_bytes(4, "big"))
+        r = GF256(digest[0])
 
-        if r.value != 0:  # Avoid zero since it would make fp(r, d) = d(0) = c0
+        if r.value != 0:
             return r
 
-        counter += 1  # Increment counter and try again if we got zero
+        counter += 1
 
 
 def verify_homomorphic_property(
@@ -100,10 +100,7 @@ def verify_homomorphic_property(
         raise ValueError("data1 and data2 must have the same length")
 
     a, b = coefficients
-    combined = bytes(
-        (a * GF256(x) + b * GF256(y)).value
-        for x, y in zip(data1, data2)
-    )
+    combined = bytes((a * GF256(x) + b * GF256(y)).value for x, y in zip(data1, data2))
 
     left = fingerprint(r, combined)
     right = (a * fingerprint(r, data1)) + (b * fingerprint(r, data2))

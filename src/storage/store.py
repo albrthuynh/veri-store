@@ -17,6 +17,9 @@ layer is responsible for serialising access if needed.
 
 from __future__ import annotations
 from pathlib import Path
+import json
+import os
+
 from .fragment import FragmentRecord
 
 
@@ -33,8 +36,26 @@ class FragmentStore:
         Args:
             base_dir: Path to the root storage directory.
         """
-        # TODO: Store base_dir as a Path, call mkdir(parents=True, exist_ok=True).
-        ...
+        self.base_dir = Path(base_dir)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._index: dict[str, set[int]] = {}
+        self._rebuild_index_from_disk()
+
+    def _rebuild_index_from_disk(self) -> None:
+        """Best-effort rebuild of the in-memory index by scanning base_dir."""
+        self._index.clear()
+        try:
+            for p in self.base_dir.rglob("fragment_*.json"):
+                if not p.is_file():
+                    continue
+                block_id = p.parent.name
+                try:
+                    idx = int(p.stem.removeprefix("fragment_"))
+                except Exception:
+                    continue
+                self._index.setdefault(block_id, set()).add(idx)
+        except OSError:
+            pass
 
     def put(self, record: FragmentRecord) -> None:
         """Persist a fragment record to disk.
@@ -47,11 +68,29 @@ class FragmentStore:
         Raises:
             IOError: If the file cannot be written.
         """
-        # TODO: 1. Build the directory path: base_dir / block_id.
-        # TODO: 2. mkdir(parents=True, exist_ok=True).
-        # TODO: 3. Write record.to_dict() as JSON to a temp file.
-        # TODO: 4. Atomically rename temp file to final path.
-        ...
+        block_dir = self.base_dir / record.block_id
+        block_dir.mkdir(parents=True, exist_ok=True)
+
+        final_path = self._fragment_path(record.block_id, record.index)
+        tmp_path = final_path.with_suffix(final_path.suffix + ".tmp")
+
+        payload = record.to_dict()
+        data = json.dumps(payload, sort_keys=True).encode("utf-8")
+
+        try:
+            with open(tmp_path, "wb") as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, final_path)
+        finally:
+            try:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+            except OSError:
+                pass
+
+        self._index.setdefault(record.block_id, set()).add(record.index)
 
     def get(self, block_id: str, index: int) -> FragmentRecord:
         """Retrieve a single fragment by (block_id, index).
@@ -66,8 +105,14 @@ class FragmentStore:
         Raises:
             FragmentNotFoundError: If no fragment is stored for this key.
         """
-        # TODO: Read JSON file, return FragmentRecord.from_dict().
-        ...
+        path = self._fragment_path(block_id, index)
+        if not path.exists():
+            raise FragmentNotFoundError((block_id, index))
+        try:
+            raw = path.read_text(encoding="utf-8")
+            return FragmentRecord.from_dict(json.loads(raw))
+        except FileNotFoundError:
+            raise FragmentNotFoundError((block_id, index))
 
     def delete(self, block_id: str, index: int) -> None:
         """Remove a stored fragment.
@@ -79,9 +124,26 @@ class FragmentStore:
         Raises:
             FragmentNotFoundError: If the fragment does not exist.
         """
-        # TODO: Unlink the fragment file.
-        # TODO: Remove block directory if now empty.
-        ...
+        path = self._fragment_path(block_id, index)
+        if not path.exists():
+            raise FragmentNotFoundError((block_id, index))
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            raise FragmentNotFoundError((block_id, index))
+
+        indices = self._index.get(block_id)
+        if indices is not None:
+            indices.discard(index)
+            if not indices:
+                self._index.pop(block_id, None)
+
+        block_dir = self.base_dir / block_id
+        try:
+            if block_dir.exists() and not any(block_dir.iterdir()):
+                block_dir.rmdir()
+        except OSError:
+            pass
 
     def list_fragments(self, block_id: str) -> list[FragmentRecord]:
         """Return all stored fragments for a given block.
@@ -93,9 +155,18 @@ class FragmentStore:
             A list of FragmentRecord objects, sorted by index.
             Empty list if no fragments are stored for this block.
         """
-        # TODO: Glob all fragment_*.json files under base_dir/block_id/.
-        # TODO: Deserialize and return sorted by record.index.
-        ...
+        block_dir = self.base_dir / block_id
+        if not block_dir.exists():
+            return []
+        records: list[FragmentRecord] = []
+        for p in block_dir.glob("fragment_*.json"):
+            try:
+                raw = p.read_text(encoding="utf-8")
+                records.append(FragmentRecord.from_dict(json.loads(raw)))
+            except Exception:
+                continue
+        records.sort(key=lambda r: r.index)
+        return records
 
     def has(self, block_id: str, index: int) -> bool:
         """Check whether a specific fragment is stored.
@@ -107,8 +178,7 @@ class FragmentStore:
         Returns:
             True if the fragment file exists, False otherwise.
         """
-        # TODO: Return _fragment_path(block_id, index).exists()
-        ...
+        return self._fragment_path(block_id, index).exists()
 
     def _fragment_path(self, block_id: str, index: int) -> Path:
         """Compute the file path for a fragment.
@@ -120,8 +190,15 @@ class FragmentStore:
         Returns:
             A Path object for the fragment's JSON file.
         """
-        # TODO: return self.base_dir / block_id / f"fragment_{index}.json"
-        ...
+        return self.base_dir / block_id / f"fragment_{index}.json"
+
+    def fragment_count(self) -> int:
+        """Return the number of stored fragments (fast path)."""
+        return sum(len(v) for v in self._index.values())
+
+    def list_indices(self, block_id: str) -> list[int]:
+        """Return stored indices for a block from in-memory state."""
+        return sorted(self._index.get(block_id, set()))
 
 
 class FragmentNotFoundError(KeyError):

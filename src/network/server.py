@@ -350,15 +350,9 @@ def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
     Returns:
         HealthResponse with status and fragment count.
     """
-    # Count all fragment JSON files stored under the server's data directory.
-    # This relies on FragmentStore.__init__ having set store.base_dir.
-    # getattr with a None default handles the case where store.base_dir is not
-    # yet set (its __init__ is still a TODO stub), keeping the health endpoint
-    # operational while the rest of the store implementation is in progress.
-    base_dir = getattr(store, "base_dir", None)
     try:
-        count = sum(1 for _ in _Path(base_dir).rglob("fragment_*.json")) if base_dir else 0
-    except OSError:
+        count = int(store.fragment_count()) 
+    except Exception:
         count = 0
 
     return HealthResponse(server_id=server_id, status="ok", fragment_count=count)

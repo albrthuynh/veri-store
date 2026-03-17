@@ -33,10 +33,16 @@ An authenticated client has verified their identity to the system and is authori
 
 \subsection{Storage Server}
 
-% COMMENT: Describe the trust level of storage servers. In the semi-trusted model, servers might
-% fail, return corrupted data, or attempt to forge fingerprints, but do not actively collude
-% (beyond the f-threshold). Specify whether servers are assumed to follow protocols correctly or
-% might exhibit Byzantine behavior.
+Storage servers are \emph{semi-trusted}. Each server is expected to run the published veri-store code and follow the protocol, but we do not assume that every server is always honest or uncompromised.
+A storage server may:
+\begin{itemize}
+    \item Crash or become unavailable.
+    \item Return stale, corrupted, or tampered fragments.
+    \item Attempt to forge data that passes simple hash checks.
+\end{itemize}
+The security model assumes that not all servers are malicious at the same time. In the 3-of-5 configuration, we rely on the homomorphic fingerprinting and cross-checksum scheme to detect inconsistent or forged fragments from a minority of servers. If more than two servers are compromised in a coordinated way, the integrity guarantees can fail.
+Servers do not have permission to modify the fpcc; they only store it and use it for verification. They also do not see user identities directly; they only see block identifiers and fragment indices.
+
 
 \subsection{Untrusted Network}
 We assume a TLS connection between clients and servers, although we do not rely on it for data integrity. Adversaries will be able to observe network traffic, and it is assumed that they will, in theory, be able to inject network traffic. 
