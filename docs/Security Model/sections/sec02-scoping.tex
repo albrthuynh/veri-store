@@ -2,27 +2,33 @@
 
 \begin{document}
 
-\section{Scoping}
-
-% COMMENT: Define what is included and excluded from this security model. Specify that this
-% model covers the veri-store core system components: fingerprinting, erasure coding, storage,
-% verification, and network communication. List what is explicitly out of scope (e.g., operating
-% system security, physical server security, user authentication mechanisms). Note that as a
-% prototype/academic project, some production concerns may be deferred to future work.
-
 \subsection{In Scope}
 
-% COMMENT: List the specific components and functionality included in this security analysis.
-% Examples: homomorphic fingerprint generation and verification, erasure code encoding/decoding,
-% fragment storage and retrieval, cross-checksum verification protocol, inter-server communication,
-% and data integrity guarantees.
+This security model focuses on the core veri-store protocol and implementation. In scope are the parts of the system that directly handle data fragments, fingerprints, and cross-checksums:
+
+\begin{itemize}
+    \item Homomorphic fingerprint generation and verification for data blocks and fragments.
+    \item Reed--Solomon erasure encoding and decoding (3-of-5 scheme) used to split and reconstruct data.
+    \item Client logic that disperses data, generates the fingerprinted cross-checksum (fpcc), and verifies fragments on retrieval.
+    \item Storage server API and logic for receiving, storing, verifying, and deleting fragments.
+    \item The fingerprinted cross-checksum protocol, including how servers use it to check fragment integrity.
+    \item Interactions between the veri-store client and storage servers over HTTP (FastAPI and \texttt{httpx}).
+    \item Protection of data integrity and authenticity for stored fragments and reconstructed blocks.
+\end{itemize}
 
 \subsection{Out of Scope}
 
-% COMMENT: List what is explicitly not covered by this security model. Examples: physical security
-% of servers, operating system vulnerabilities, DoS attacks on network infrastructure, user
-% authentication/authorization (assuming authenticated users), Byzantine fault tolerance beyond
-% what homomorphic fingerprints provide. Document these as assumptions or dependencies.
+Some important security topics are intentionally out of scope for this project. We document them here so that readers do not assume they are handled:
+
+\begin{itemize}
+    \item Physical security of machines (e.g., data center access control, hardware tampering).
+    \item Operating system and hypervisor security, including kernel exploits and container escapes.
+    \item Network-layer protections such as DDoS mitigation, BGP attacks, or link encryption; we assume a working TCP/IP network and optionally TLS.
+    \item User authentication and authorization beyond the ``authenticated client'' abstraction; account management and access control are not modeled.
+    \item Confidentiality of stored data; veri-store detects tampering but does not encrypt data. Sensitive data must be encrypted before use.
+    \item Availability in the face of more than two failed or unreachable servers (beyond the 3-of-5 erasure code tolerance).
+    \item Advanced Byzantine behavior such as large-scale collusion between many servers or compromised clients coordinating attacks.
+\end{itemize}
 
 \newpage
 \end{document}

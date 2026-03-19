@@ -11,25 +11,28 @@
 
 \subsection{Client API}
 
+The client API is the main way that users interact with veri-store. It groups three high-level operations:
 \begin{itemize}
-    \item \textbf{Store operation}: % Client submits data block for encoding and distribution
-    \item \textbf{Retrieve operation}: % Client requests data block reconstruction from fragments
-    \item \textbf{Verify operation}: % Client checks data integrity using fingerprints
+    \item \textbf{Store operation}: The client sends a data block to veri-store. The client encodes the block into fragments, generates the fpcc, and then issues HTTP requests to store each fragment on its assigned server.
+    \item \textbf{Retrieve operation}: The client requests a stored block by its identifier. It asks multiple servers for fragments, verifies each fragment against the fpcc, and reconstructs the original data once enough valid fragments are available.
+    \item \textbf{Verify operation}: The client (or an operator) can re-check that stored fragments are still consistent with the fpcc, without needing to reconstruct the full block. This detects tampering after the initial store.
 \end{itemize}
 
 \subsection{Inter-Server Communication}
 
+In the basic project deployment, all ``servers'' run on the same host, but the design assumes they could be separate machines on a network. Inter-server communication is limited and well-defined:
 \begin{itemize}
-    \item \textbf{Fingerprint exchange}: % Servers share fingerprints for cross-checksum verification
-    \item \textbf{Fragment retrieval}: % Servers request fragments from peers for reconstruction
+    \item \textbf{Fingerprint exchange}: In extended deployments, servers may exchange fingerprint values or fpcc digests to support cross-checking and audit workflows. This path is treated as semi-trusted and is protected by the same fingerprinting assumptions as the client API.
+    \item \textbf{Fragment retrieval}: A server may request fragments from peer servers to assist with recovery or migration. Any fragment obtained this way is still subject to the same fpcc-based verification before being used.
 \end{itemize}
 
 \subsection{Storage Subsystem}
 
+The storage subsystem covers all local file operations used to persist fragments and metadata on each server:
 \begin{itemize}
-    \item \textbf{Fragment write}: % Store encoded fragment to local disk
-    \item \textbf{Fragment read}: % Retrieve fragment from local disk
-    \item \textbf{Fingerprint storage}: % Store/retrieve homomorphic fingerprints
+    \item \textbf{Fragment write}: The server writes encoded fragments and their associated metadata (including fpcc digests and verification status) to disk. Writes use a write-then-rename pattern to reduce the chance of partial files.
+    \item \textbf{Fragment read}: The server reads fragments and metadata back from disk to answer client requests or to perform re-verification. If a file is missing or malformed, the server treats the fragment as unavailable.
+    \item \textbf{Fingerprint storage}: The server stores enough information (such as fpcc digests or JSON-serialized fpcc) to allow future integrity checks without needing the client to resend the fpcc.
 \end{itemize}
 
 \newpage

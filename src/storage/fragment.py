@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import base64
 
 
 class VerificationStatus(Enum):
@@ -53,29 +54,38 @@ class FragmentRecord:
     fpcc_digest: str | None = None
 
     def to_dict(self) -> dict:
-        """Serialize the fragment record to a JSON-compatible dictionary.
-
-        Returns:
-            A dict with all fields serialized to JSON-safe types.
-            bytes fields are base64-encoded; datetime is ISO 8601.
-        """
-        # TODO: Serialize each field. Use base64.b64encode for self.data.
-        # TODO: Use received_at.isoformat() for the timestamp.
-        ...
+        """ Serialize the fragment record to a JSON-compatible dictionary. """
+        return {
+            "index": self.index,
+            "data": base64.b64encode(self.data).decode("ascii"),
+            "block_id": self.block_id,
+            "total_n": self.total_n,
+            "threshold_m": self.threshold_m,
+            "original_length": self.original_length,
+            "received_at": self.received_at.isoformat(),
+            "verification_status": self.verification_status.value,
+            "fpcc_digest": self.fpcc_digest,
+        }
 
     @classmethod
     def from_dict(cls, d: dict) -> FragmentRecord:
-        """Deserialize a FragmentRecord from a dictionary.
+        """ Deserialize a FragmentRecord from a dictionary. """
+        data = base64.b64decode(d["data"])
+        received_at = datetime.fromisoformat(d["received_at"])
+        verification_status = VerificationStatus(d["verification_status"])
 
-        Args:
-            d: A dict in the format produced by to_dict().
+        fpcc_digest = d.get("fpcc_digest")
+        if fpcc_digest is not None and not isinstance(fpcc_digest, str):
+            raise ValueError("fpcc_digest must be a string or None")
 
-        Returns:
-            A FragmentRecord instance.
-
-        Raises:
-            KeyError:   If a required field is missing.
-            ValueError: If a field value is malformed.
-        """
-        # TODO: Decode base64 data, parse ISO datetime, map string to enum.
-        ...
+        return cls(
+            index=int(d["index"]),
+            data=data,
+            block_id=str(d["block_id"]),
+            total_n=int(d["total_n"]),
+            threshold_m=int(d["threshold_m"]),
+            original_length=int(d["original_length"]),
+            received_at=received_at,
+            verification_status=verification_status,
+            fpcc_digest=fpcc_digest,
+        )

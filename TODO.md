@@ -44,8 +44,8 @@
 
 #### Joint
 
-- [ ] Code review each other's primitives
-- [ ] Integration test: encode data, verify field arithmetic works on fragments
+- [x] Code review each other's primitives
+- [x] Integration test: encode data, verify field arithmetic works on fragments
 
 ---
 
@@ -60,15 +60,15 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Design fingerprinted cross-checksum (fpcc) data structure
-- [ ] Implement fpcc generation: hash all fragments, fingerprint first 3
-- [ ] Implement random oracle for deterministic r: r = hash(all fragment hashes)
-- [ ] Write serialization/deserialization for fpcc (JSON or pickle)
+- [x] Design fingerprinted cross-checksum (fpcc) data structure
+- [x] Implement fpcc generation: hash all fragments, fingerprint first 3
+- [x] Implement random oracle for deterministic r: r = hash(all fragment hashes)
+- [x] Write serialization/deserialization for fpcc (JSON or pickle)
 
 #### Joint
 
-- [ ] Integration test: encode block → generate fpcc → verify it's correct
-- [ ] Test homomorphic property on actual erasure-coded fragments
+- [x] Integration test: encode block → generate fpcc → verify it's correct
+- [x] Test homomorphic property on actual erasure-coded fragments
 
 ---
 
@@ -90,25 +90,25 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Implement HTTP server process (Flask/FastAPI)
-- [ ] Each server runs on different port (5001, 5002, ..., 5005)
-- [ ] Implement storage backend (save fragments to disk with metadata)
-- [ ] Implement server state management (track stored fragments)
+- [x] Implement HTTP server process (Flask/FastAPI)
+- [x] Each server runs on different port (5001, 5002, ..., 5005)
+- [x] Implement storage backend (save fragments to disk with metadata)
+- [x] Implement server state management (track stored fragments)
 - [x] **Security Model §5:** Implementation Assumptions — documented
 - [x] **Security Model §6.1:** Administrator trust level — documented
-- [ ] **Security Model §2.1:** Write In Scope
-- [ ] **Security Model §2.2:** Write Out of Scope
-- [ ] **Security Model §4.2:** Write System Dependencies
-- [ ] **Security Model §6.3:** Write Storage Server trust level
-- [ ] **Security Model §7.1:** Write Client API entry points (store, retrieve, verify)
-- [ ] **Security Model §7.2:** Write Inter-Server Communication entry points
-- [ ] **Security Model §7.3:** Write Storage Subsystem entry points
+- [x] **Security Model §2.1:** Write In Scope
+- [x] **Security Model §2.2:** Write Out of Scope
+- [x] **Security Model §4.2:** Write System Dependencies
+- [x] **Security Model §6.3:** Write Storage Server trust level
+- [x] **Security Model §7.1:** Write Client API entry points (store, retrieve, verify)
+- [x] **Security Model §7.2:** Write Inter-Server Communication entry points
+- [x] **Security Model §7.3:** Write Storage Subsystem entry points
 
 #### Joint
 
-- [ ] Test: start 5 servers, verify they respond to health checks
-- [ ] Test: send fragment to server, verify it stores correctly
-- [ ] **Security Model:** Review and sign off on §1–7 together
+- [x] Test: start 5 servers, verify they respond to health checks
+- [x] Test: send fragment to server, verify it stores correctly
+- [x] **Security Model:** Review and sign off on §1–7 together
 
 ---
 

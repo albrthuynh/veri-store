@@ -13,12 +13,11 @@ References:
 
 from __future__ import annotations
 
-
 IRREDUCIBLE_POLY: int = 0x11B
 
 # Pre-compute the multiplicative inverse table for all non-zero elements.
 _INVERSE_TABLE = [0] * 256
-for _a in range (1, 256):
+for _a in range(1, 256):
     for _b in range(1, 256):
         _result, _x, _y = 0, _a, _b
 
@@ -33,6 +32,7 @@ for _a in range (1, 256):
         if _result == 1:
             _INVERSE_TABLE[_a] = _b
             break
+
 
 class GF256:
     """An element of GF(2^8).
@@ -99,14 +99,13 @@ class GF256:
         while other_int > 0:
             if other_int & 1:
                 result ^= self_int
-            
+
             other_int >>= 1
             self_int <<= 1
             if self_int & 0x100:
                 self_int ^= IRREDUCIBLE_POLY
 
         return GF256(result)
-
 
     def __truediv__(self, other: GF256) -> GF256:
         """Field division: self * other^{-1}.
@@ -154,7 +153,9 @@ class GF256:
             ZeroDivisionError: If self is the zero element.
         """
         if self.value == 0:
-            raise ZeroDivisionError("zero element has no multiplicative inverse in GF(2^8)")
+            raise ZeroDivisionError(
+                "zero element has no multiplicative inverse in GF(2^8)"
+            )
         return GF256(_INVERSE_TABLE[self.value])
 
     # ------------------------------------------------------------------
@@ -179,9 +180,11 @@ class GF256:
         """Convert to plain Python int."""
         return self.value
 
+
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
+
 
 def build_exp_log_tables(poly: int = IRREDUCIBLE_POLY) -> tuple[list[int], list[int]]:
     """Pre-compute exponentiation and logarithm tables for GF(2^8).
@@ -208,6 +211,6 @@ def build_exp_log_tables(poly: int = IRREDUCIBLE_POLY) -> tuple[list[int], list[
         if x & 0x100:
             x ^= IRREDUCIBLE_POLY
 
-    exp_table[255] = 1  # g^255 == g^0 == 1 (the group has order 255)
+    exp_table[255] = 1
 
     return exp_table, log_table
