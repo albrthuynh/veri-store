@@ -37,14 +37,31 @@ class ServerAddress:
         port (int):      TCP port.
     """
     server_id: int
+    port: int
     host: str = "localhost"
-    port: int = 5001
+
+    def __post_init__(self) -> None:
+        """Validate the server address fields."""
+        errors = []
+
+        if not isinstance(self.server_id, int) or self.server_id < 1:
+            errors.append(
+                f"Invalid server_id: {self.server_id}. Must be an integer >= 1."
+            )
+
+        if not isinstance(self.port, int) or not (1 <= self.port <= 65535):
+            errors.append(
+                f"Invalid port number: {self.port}. Must be an integer between 1 and 65535."
+            )
+
+        if errors:
+            raise ValueError("\n".join(errors))
 
     @property
     def base_url(self) -> str:
         """Construct the base URL for this server."""
-        # TODO: return f"http://{self.host}:{self.port}"
-        ...
+        return f"http://{self.host}:{self.port}"
+
 
 
 class VeriStoreClient:
@@ -62,16 +79,34 @@ class VeriStoreClient:
         m: int = 3,
         timeout: float = 5.0,
     ) -> None:
-        """Initialise the client.
+        """Validate and initialise the client.
 
         Args:
             servers: List of server addresses (length == n).
             m:       Reconstruction threshold (default 3).
             timeout: Per-request HTTP timeout in seconds (default 5.0).
         """
-        # TODO: Validate len(servers) >= m.
-        # TODO: Store attributes.
-        ...
+        errors = []
+        if (servers is None) or (not isinstance(servers, list)) or (len(servers) <= 0):
+            errors.append("servers must be a non-empty list of ServerAddress objects.")
+        elif not all(isinstance(s, ServerAddress) for s in servers):
+            errors.append("All items in servers must be instances of ServerAddress.")
+
+        if not isinstance(m, int) or m <= 0:
+            errors.append("m must be a positive integer.")
+
+        if isinstance(servers, list) and isinstance(m, int) and len(servers) < m:
+            errors.append(f"Number of servers (n={len(servers)}) must be >= m ({m}).")
+
+        if not isinstance(timeout, (int, float)) or timeout <= 0:
+            errors.append("Timeout must be a positive number.")
+
+        if errors:
+            raise ValueError("\n".join(errors))
+
+        self.servers = servers
+        self.m = m
+        self.timeout = timeout
 
     def put(self, block_id: str, data: bytes) -> str:
         """Encode data and disperse fragments to all servers.
