@@ -23,8 +23,19 @@ before passing data to the caller.
 """
 
 from __future__ import annotations
-import httpx
+
+import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+
+import httpx
+from pydantic import ValidationError
+
+from src.erasure.decoder import decode
+from src.erasure.encoder import Fragment, encode
+from src.network.protocol import GetFragmentResponse, StoreFragmentRequest
+from src.verification.cross_checksum import FingerprintedCrossChecksum
+from src.verification.verifier import VerificationResult, Verifier
 
 
 @dataclass
@@ -36,6 +47,7 @@ class ServerAddress:
         host (str):      Hostname or IP address.
         port (int):      TCP port.
     """
+
     server_id: int
     host: str = "localhost"
     port: int = 5001
@@ -43,8 +55,7 @@ class ServerAddress:
     @property
     def base_url(self) -> str:
         """Construct the base URL for this server."""
-        # TODO: return f"http://{self.host}:{self.port}"
-        ...
+        return f"http://{self.host}:{self.port}"
 
 
 class VeriStoreClient:
@@ -69,9 +80,16 @@ class VeriStoreClient:
             m:       Reconstruction threshold (default 3).
             timeout: Per-request HTTP timeout in seconds (default 5.0).
         """
-        # TODO: Validate len(servers) >= m.
-        # TODO: Store attributes.
-        ...
+        if m <= 0:
+            raise ValueError("m must be >= 1")
+        if len(servers) < m:
+            raise ValueError("len(servers) must be >= m")
+        if timeout <= 0:
+            raise ValueError("timeout must be > 0")
+
+        self.servers = servers
+        self.m = m
+        self.timeout = timeout
 
     def put(self, block_id: str, data: bytes) -> str:
         """Encode data and disperse fragments to all servers.
@@ -86,12 +104,44 @@ class VeriStoreClient:
         Raises:
             DispersalError: If fewer than m servers accepted the fragment.
         """
-        # TODO: 1. Call erasure.encode(data, n=len(servers), m=self.m).
-        # TODO: 2. Call FingerprintedCrossChecksum.generate(fragments).
-        # TODO: 3. For each fragment, POST to the corresponding server (parallel).
-        # TODO: 4. Count successes; raise DispersalError if < m succeed.
-        # TODO: 5. Return block_id.
-        ...
+        fragments = encode(data, n=len(self.servers), m=self.m, block_id=block_id)
+        fpcc = FingerprintedCrossChecksum.generate(fragments)
+        fpcc_json = fpcc.to_json()
+
+        def _put_one(server: ServerAddress, fragment: Fragment) -> bool:
+            request_body = StoreFragmentRequest(
+                fragment_data=base64.b64encode(fragment.data).decode(),
+                total_n=fragment.total_n,
+                threshold_m=fragment.threshold_m,
+                original_length=fragment.original_length,
+                fpcc_json=fpcc_json,
+            )
+            try:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.put(
+                        self._server_url(server, fragment.block_id, fragment.index),
+                        json=request_body.model_dump(),
+                    )
+                    return response.status_code == 200
+            except httpx.RequestError:
+                return False
+
+        successes = 0
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [
+                pool.submit(_put_one, server, fragment)
+                for server, fragment in zip(self.servers, fragments)
+            ]
+            for future in as_completed(futures):
+                if future.result():
+                    successes += 1
+
+        if successes < self.m:
+            raise DispersalError(
+                f"Dispersal failed: only {successes}/{len(self.servers)} servers accepted fragments."
+            )
+
+        return fragments[0].block_id
 
     def get(self, block_id: str) -> bytes:
         """Retrieve and reconstruct the original data for a block.
@@ -106,14 +156,74 @@ class VeriStoreClient:
             RetrievalError: If fewer than m fragments can be retrieved or
                             verified.
         """
-        # TODO: 1. Request fragment from each server (parallel, best-effort).
-        # TODO: 2. Collect the first m successful responses.
-        # TODO: 3. Deserialize fpcc from the first response.
-        # TODO: 4. Re-verify each retrieved fragment with Verifier.check().
-        # TODO: 5. If any fragment fails verification, discard and try next server.
-        # TODO: 6. Call erasure.decode(verified_fragments).
-        # TODO: 7. Return reconstructed data.
-        ...
+
+        def _get_one(server: ServerAddress, index: int) -> GetFragmentResponse | None:
+            try:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.get(self._server_url(server, block_id, index))
+                if response.status_code != 200:
+                    return None
+                return GetFragmentResponse.model_validate(response.json())
+            except (httpx.RequestError, ValidationError, ValueError):
+                return None
+
+        successful_responses: list[GetFragmentResponse] = []
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [
+                pool.submit(_get_one, server, index)
+                for index, server in enumerate(self.servers)
+            ]
+            for future in as_completed(futures):
+                response_model = future.result()
+                if response_model is not None:
+                    successful_responses.append(response_model)
+
+        if not successful_responses:
+            raise RetrievalError("Retrieval failed: no servers returned a fragment.")
+
+        base_fpcc_json = successful_responses[0].fpcc_json
+
+        try:
+            fpcc = FingerprintedCrossChecksum.from_json(base_fpcc_json)
+        except Exception as exc:  # pragma: no cover - defensive parse guard
+            raise RetrievalError(
+                f"Retrieval failed: invalid fpcc from server response ({exc})."
+            ) from exc
+
+        verified_fragments: list[Fragment] = []
+        for response_model in successful_responses:
+            if response_model.fpcc_json != base_fpcc_json:
+                continue
+            try:
+                fragment_bytes = base64.b64decode(response_model.fragment_data)
+            except Exception:
+                continue
+            report = Verifier.check(response_model.index, fragment_bytes, fpcc)
+            if report.result != VerificationResult.CONSISTENT:
+                continue
+
+            verified_fragments.append(
+                Fragment(
+                    index=response_model.index,
+                    data=fragment_bytes,
+                    block_id=response_model.block_id,
+                    total_n=response_model.total_n,
+                    threshold_m=response_model.threshold_m,
+                    original_length=response_model.original_length,
+                )
+            )
+            if len(verified_fragments) >= self.m:
+                break
+
+        if len(verified_fragments) < self.m:
+            raise RetrievalError(
+                f"Retrieval failed: only {len(verified_fragments)} verified fragments available; need {self.m}."
+            )
+
+        try:
+            return decode(verified_fragments)
+        except Exception as exc:
+            raise RetrievalError(f"Retrieval failed during decode: {exc}") from exc
 
     def delete(self, block_id: str) -> None:
         """Request deletion of a stored block from all servers.
@@ -135,6 +245,7 @@ class VeriStoreClient:
             A dict mapping server_id -> True (healthy) / False (unreachable).
         """
         # TODO: GET /health from each server; catch httpx.RequestError.
+
         ...
 
     def _server_url(self, server: ServerAddress, block_id: str, index: int) -> str:
@@ -148,8 +259,7 @@ class VeriStoreClient:
         Returns:
             Full URL string, e.g. "http://localhost:5001/fragments/abc123/0".
         """
-        # TODO: return f"{server.base_url}/fragments/{block_id}/{index}"
-        ...
+        return f"{server.base_url}/fragments/{block_id}/{index}"
 
 
 class DispersalError(RuntimeError):

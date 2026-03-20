@@ -127,13 +127,13 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Implement client HTTP requests (PUT, GET endpoints)
-- [ ] Implement dispersal protocol: encode → compute fpcc → send to all servers
-- [ ] Implement retrieval protocol: request from all → collect 3 → decode
-- [ ] Handle network timeouts and server unavailability
-- [ ] **Security Model §9.1.1:** Write Client DFD component description
-- [ ] **Security Model §9.1.2–9.1.4:** Write Encode Block, Compute Fingerprint, Distribute Fragments descriptions
-- [ ] **Security Model §9.1.5–9.1.8:** Write Network, Fragment Storage, Verify Fragments, Reconstruct Block descriptions
+- [x] Implement client HTTP requests (PUT, GET endpoints)
+- [x] Implement dispersal protocol: encode → compute fpcc → send to all servers
+- [x] Implement retrieval protocol: request from all → collect 3 → decode
+- [x] Handle network timeouts and server unavailability
+- [x] **Security Model §9.1.1:** Write Client DFD component description
+- [x] **Security Model §9.1.2–9.1.4:** Write Encode Block, Compute Fingerprint, Distribute Fragments descriptions
+- [x] **Security Model §9.1.5–9.1.8:** Write Network, Fragment Storage, Verify Fragments, Reconstruct Block descriptions
 
 #### Joint
 
