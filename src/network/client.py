@@ -25,6 +25,7 @@ before passing data to the caller.
 from __future__ import annotations
 
 import base64
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
@@ -36,6 +37,8 @@ from src.erasure.encoder import Fragment, encode
 from src.network.protocol import GetFragmentResponse, StoreFragmentRequest
 from src.verification.cross_checksum import FingerprintedCrossChecksum
 from src.verification.verifier import VerificationResult, Verifier
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -234,9 +237,33 @@ class VeriStoreClient:
         Args:
             block_id: The key of the block to delete.
         """
-        # TODO: Send DELETE /fragments/{block_id}/{i} to each server.
-        # TODO: Log any unexpected errors but do not raise.
-        ...
+        def _delete_one(server: ServerAddress, index: int) -> None:
+            try:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.delete(self._server_url(server, block_id, index))
+                if response.status_code in (200, 404):
+                    return
+                _log.warning(
+                    "DELETE unexpected status from server %s (%s): %s",
+                    server.server_id,
+                    self._server_url(server, block_id, index),
+                    response.status_code,
+                )
+            except httpx.RequestError as exc:
+                _log.warning(
+                    "DELETE request error for server %s (%s): %s",
+                    server.server_id,
+                    self._server_url(server, block_id, index),
+                    exc,
+                )
+
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [
+                pool.submit(_delete_one, server, index)
+                for index, server in enumerate(self.servers)
+            ]
+            for future in as_completed(futures):
+                future.result()
 
     def health_check(self) -> dict[int, bool]:
         """Ping all servers and return their availability.
@@ -244,9 +271,21 @@ class VeriStoreClient:
         Returns:
             A dict mapping server_id -> True (healthy) / False (unreachable).
         """
-        # TODO: GET /health from each server; catch httpx.RequestError.
+        def _health_one(server: ServerAddress) -> tuple[int, bool]:
+            try:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.get(f"{server.base_url}/health")
+                return server.server_id, response.status_code == 200
+            except httpx.RequestError:
+                return server.server_id, False
 
-        ...
+        results: dict[int, bool] = {}
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [pool.submit(_health_one, server) for server in self.servers]
+            for future in as_completed(futures):
+                server_id, healthy = future.result()
+                results[server_id] = healthy
+        return results
 
     def _server_url(self, server: ServerAddress, block_id: str, index: int) -> str:
         """Build the fragment endpoint URL for a given server.

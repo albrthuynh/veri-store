@@ -14,6 +14,13 @@ set -euo pipefail
 
 DATA_DIR="${DATA_DIR:-./data}"
 HOST="${HOST:-127.0.0.1}"
+UVICORN_BIN="${UVICORN_BIN:-./venv/bin/uvicorn}"
+
+if [[ ! -x "${UVICORN_BIN}" ]]; then
+  echo "ERROR: uvicorn binary not found at ${UVICORN_BIN}"
+  echo "Tip: set UVICORN_BIN or activate/create your virtualenv first."
+  exit 1
+fi
 
 cleanup() {
   # Kill all child processes in this process group.
@@ -26,7 +33,7 @@ for id in 1 2 3 4 5; do
   port=$((5000 + id))
   echo "Starting server ${id} on ${HOST}:${port} (DATA_DIR=${DATA_DIR})"
   SERVER_ID="${id}" DATA_DIR="${DATA_DIR}" \
-    uvicorn src.network.server:app --host "${HOST}" --port "${port}" &
+    "${UVICORN_BIN}" src.network.server:app --host "${HOST}" --port "${port}" &
 done
 
 wait

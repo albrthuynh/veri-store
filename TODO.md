@@ -137,8 +137,8 @@
 
 #### Joint
 
-- [ ] End-to-end test: client uploads object, 5 servers receive fragments
-- [ ] Test retrieval: client fetches object successfully
+- [x] End-to-end test: client uploads object, 5 servers receive fragments
+- [x] Test retrieval: client fetches object successfully
 - [ ] **Security Model:** Review §8 and §9.1 together; verify DFD matches implementation
 
 ---
@@ -156,12 +156,12 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Implement crash fault simulation (kill servers mid-operation)
-- [ ] Test retrieval with only 3/5 servers available
-- [ ] Implement graceful degradation (continue with failures)
-- [ ] Add metrics: success rate, fragments lost, recovery time
-- [ ] **Security Model §10.3:** Write Repudiation threats (R.1, R.2, R.3)
-- [ ] **Security Model §10.4:** Write Information Disclosure threats (I.1, I.2, I.3, I.4)
+- [x] Implement crash fault simulation (kill servers mid-operation)
+- [x] Test retrieval with only 3/5 servers available
+- [x] Implement graceful degradation (continue with failures)
+- [x] Add metrics: success rate, fragments lost, recovery time
+- [x] **Security Model §10.3:** Write Repudiation threats (R.1, R.2, R.3)
+- [x] **Security Model §10.4:** Write Information Disclosure threats (I.1, I.2, I.3, I.4)
 
 #### Joint
 
@@ -334,7 +334,7 @@
 - [ ] Homomorphic fingerprinting
 - [ ] Fingerprinted cross-checksum
 - [ ] 5 HTTP servers (can run as processes)
-- [ ] HTTP client (PUT/GET/DELETE)
+- [x] HTTP client (PUT/GET/DELETE)
 - [ ] Verification logic
 - [ ] Test suite (unit + integration)
 
@@ -348,7 +348,7 @@
 
 ### Demo Requirements
 
-- [ ] Normal operation: upload → retrieve
+- [x] Normal operation: upload → retrieve
 - [ ] Fault tolerance: crash 2 servers → still works
 - [ ] Byzantine detection: inject bad fragment → rejected
 - [ ] Performance metrics visualization
