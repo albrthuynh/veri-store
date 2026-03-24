@@ -116,7 +116,7 @@
 
 #### Mac (Security/Software Engineering)
 
-- [ ] Implement client-side security checks
+- [X] Implement client-side security checks
 - [ ] Verify server responses contain valid signatures
 - [ ] Implement retry logic for failed requests
 - [ ] Add logging for security events (verification failures)

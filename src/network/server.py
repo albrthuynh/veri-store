@@ -341,7 +341,9 @@ def delete_fragment(
 
 
 def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
-    """Handle GET /health.
+    """Handle GET /health. Confirms the server is running and attempts a lightweight
+    check of the fragment store. Not a comprehensive health check, but sufficient 
+    for Kubernetes liveness/readiness probes.
 
     Args:
         store:     The server's fragment store (used to count stored fragments).
@@ -350,12 +352,15 @@ def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
     Returns:
         HealthResponse with status and fragment count.
     """
+    status = "ok"
+
     try:
         count = int(store.fragment_count()) 
     except Exception:
         count = 0
+        status = "failed"
 
-    return HealthResponse(server_id=server_id, status="ok", fragment_count=count)
+    return HealthResponse(server_id=server_id, status=status, fragment_count=count)
 
 
 # ---------------------------------------------------------------------------
