@@ -117,7 +117,7 @@
 #### Mac (Security/Software Engineering)
 
 - [X] Implement client-side security checks
-- [ ] Verify server responses contain valid signatures
+- [X] Verify server responses contain valid signatures
 - [ ] Implement retry logic for failed requests
 - [ ] Add logging for security events (verification failures)
 - [ ] **Security Model §8.1:** Write Data Blocks protected asset

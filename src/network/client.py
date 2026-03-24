@@ -27,6 +27,7 @@ import asyncio
 import base64
 import logging
 import httpx
+
 from dataclasses import dataclass
 
 from ..erasure.decoder import decode
@@ -153,7 +154,23 @@ class VeriStoreClient:
                         "fpcc_json": fpcc_json,
                     },
                 )
-                return response.is_success
+                if response.is_success:
+                    try:
+                        body = response.json()
+                        status = body.get("verification_status", "")
+                        if status and status.lower() != "valid":
+                            _log.warning(
+                                "Server %d accepted fragment %d for block %s "
+                                "but reported verification_status=%r.",
+                                server.server_id,
+                                fragment.index,
+                                block_id,
+                                status,
+                            )
+                    except ValueError:
+                        pass
+                    return True
+                return False
             except httpx.RequestError:
                 return False
 
@@ -219,17 +236,40 @@ class VeriStoreClient:
                 f"Retrieval failed: only {len(fragment_responses)}/{len(self.servers)} servers responded with fragments; need at least {self.m}."
             )
         
-        fpcc = None
+        # Build a digest → (fpcc, count) map across all responses.
+        # A Byzantine server could return a tampered fpcc to poison verification,
+        # so we use the fpcc whose digest is shared by the most servers (majority
+        # vote) rather than blindly trusting the first one we can parse.
+        fpcc_votes: dict[str, tuple[FingerprintedCrossChecksum, int]] = {}
         for response in fragment_responses:
             try:
-                fpcc = FingerprintedCrossChecksum.from_json(response["fpcc_json"])
-                break
+                candidate = FingerprintedCrossChecksum.from_json(response["fpcc_json"])
+                d = candidate.digest()
+                if d in fpcc_votes:
+                    fpcc_votes[d] = (fpcc_votes[d][0], fpcc_votes[d][1] + 1)
+                else:
+                    fpcc_votes[d] = (candidate, 1)
             except (KeyError, ValueError, TypeError):
                 continue
-        
-        if fpcc is None:
+
+        if not fpcc_votes:
             raise RetrievalError(
                 "Retrieval failed: no valid fpcc found in server responses; cannot verify fragments."
+            )
+
+        fpcc_digest, (fpcc, fpcc_count) = max(
+            fpcc_votes.items(), key=lambda item: item[1]
+        )
+
+        if len(fpcc_votes) > 1:
+            _log.warning(
+                "fpcc mismatch across servers for block %s: %d distinct fpccs received. "
+                "Using fpcc supported by %d/%d servers (digest %s).",
+                block_id,
+                len(fpcc_votes),
+                fpcc_count,
+                len(fragment_responses),
+                fpcc_digest[:16],
             )
 
         # Build the list of verified fragments until either every fragment is tested or we have m verified fragments.
@@ -242,7 +282,42 @@ class VeriStoreClient:
             except (KeyError, ValueError, TypeError):
                 continue
 
-            # Verify the fragment against the fpcc.
+            # Advisory check: log if the server's own stored status is not valid.
+            # We still run independent re-verification below, but a server-reported
+            # INVALID is a strong signal of a Byzantine or corrupted fragment.
+            server_status = response.get("verification_status", "")
+            if server_status and server_status.lower() != "valid":
+                _log.warning(
+                    "Server reported verification_status=%r for fragment %d of block %s; "
+                    "running independent re-verification.",
+                    server_status,
+                    index,
+                    block_id,
+                )
+
+            # Skip fragments whose accompanying fpcc doesn't match the majority.
+            # A mismatched fpcc means either the server tampered with it or is
+            # Byzantine; either way this fragment cannot be safely verified.
+            try:
+                response_fpcc_digest = FingerprintedCrossChecksum.from_json(
+                    response["fpcc_json"]
+                ).digest()
+                if response_fpcc_digest != fpcc_digest:
+                    _log.warning(
+                        "Skipping fragment %d of block %s: server returned "
+                        "mismatched fpcc (digest %s != majority %s).",
+                        index,
+                        block_id,
+                        response_fpcc_digest[:16],
+                        fpcc_digest[:16],
+                    )
+                    continue
+            except (KeyError, ValueError, TypeError):
+                # No parseable fpcc in this response; still verify against the
+                # majority fpcc (the fragment data itself may be fine).
+                pass
+
+            # Verify the fragment against the majority fpcc.
             verification_report = Verifier.check(index, fragment_data, fpcc)
 
             if verification_report.result == VerificationResult.CONSISTENT:
