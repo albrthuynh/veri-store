@@ -23,18 +23,20 @@ before passing data to the caller.
 """
 
 from __future__ import annotations
-import asyncio
+
 import base64
 import logging
-import httpx
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from ..erasure.decoder import decode
-from ..erasure.encoder import Fragment, encode
-from ..verification.cross_checksum import FingerprintedCrossChecksum
-from ..verification.verifier import VerificationResult, Verifier
+import httpx
+from pydantic import ValidationError
 
+from src.erasure.decoder import decode
+from src.erasure.encoder import Fragment, encode
+from src.network.protocol import GetFragmentResponse, StoreFragmentRequest
+from src.verification.cross_checksum import FingerprintedCrossChecksum
+from src.verification.verifier import VerificationResult, Verifier
 
 _log = logging.getLogger(__name__)
 
@@ -48,32 +50,15 @@ class ServerAddress:
         host (str):      Hostname or IP address.
         port (int):      TCP port.
     """
+
     server_id: int
-    port: int
     host: str = "localhost"
-
-    def __post_init__(self) -> None:
-        """Validate the server address fields."""
-        errors = []
-
-        if not isinstance(self.server_id, int) or self.server_id < 1:
-            errors.append(
-                f"Invalid server_id: {self.server_id}. Must be an integer >= 1."
-            )
-
-        if not isinstance(self.port, int) or not (1 <= self.port <= 65535):
-            errors.append(
-                f"Invalid port number: {self.port}. Must be an integer between 1 and 65535."
-            )
-
-        if errors:
-            raise ValueError("\n".join(errors))
+    port: int = 5001
 
     @property
     def base_url(self) -> str:
         """Construct the base URL for this server."""
         return f"http://{self.host}:{self.port}"
-
 
 
 class VeriStoreClient:
@@ -91,30 +76,19 @@ class VeriStoreClient:
         m: int = 3,
         timeout: float = 5.0,
     ) -> None:
-        """Validate and initialise the client.
+        """Initialise the client.
 
         Args:
             servers: List of server addresses (length == n).
             m:       Reconstruction threshold (default 3).
             timeout: Per-request HTTP timeout in seconds (default 5.0).
         """
-        errors = []
-        if (servers is None) or (not isinstance(servers, list)) or (len(servers) <= 0):
-            errors.append("servers must be a non-empty list of ServerAddress objects.")
-        elif not all(isinstance(s, ServerAddress) for s in servers):
-            errors.append("All items in servers must be instances of ServerAddress.")
-
-        if not isinstance(m, int) or m <= 0:
-            errors.append("m must be a positive integer.")
-
-        if isinstance(servers, list) and isinstance(m, int) and len(servers) < m:
-            errors.append(f"Number of servers (n={len(servers)}) must be >= m ({m}).")
-
-        if not isinstance(timeout, (int, float)) or timeout <= 0:
-            errors.append("Timeout must be a positive number.")
-
-        if errors:
-            raise ValueError("\n".join(errors))
+        if m <= 0:
+            raise ValueError("m must be >= 1")
+        if len(servers) < m:
+            raise ValueError("len(servers) must be >= m")
+        if timeout <= 0:
+            raise ValueError("timeout must be > 0")
 
         self.servers = servers
         self.m = m
@@ -134,62 +108,43 @@ class VeriStoreClient:
             DispersalError: If fewer than m servers accepted the fragment.
         """
         fragments = encode(data, n=len(self.servers), m=self.m, block_id=block_id)
-
         fpcc = FingerprintedCrossChecksum.generate(fragments)
         fpcc_json = fpcc.to_json()
 
-        async def post_fragment(
-            client: httpx.AsyncClient,
-            server: ServerAddress,
-            fragment,
-        ) -> bool:
+        def _put_one(server: ServerAddress, fragment: Fragment) -> bool:
+            request_body = StoreFragmentRequest(
+                fragment_data=base64.b64encode(fragment.data).decode(),
+                total_n=fragment.total_n,
+                threshold_m=fragment.threshold_m,
+                original_length=fragment.original_length,
+                fpcc_json=fpcc_json,
+            )
             try:
-                response = await client.put(
-                    self._server_url(server, block_id, fragment.index),
-                    json={
-                        "fragment_data": base64.b64encode(fragment.data).decode("ascii"),
-                        "total_n": fragment.total_n,
-                        "threshold_m": fragment.threshold_m,
-                        "original_length": fragment.original_length,
-                        "fpcc_json": fpcc_json,
-                    },
-                )
-                if response.is_success:
-                    try:
-                        body = response.json()
-                        status = body.get("verification_status", "")
-                        if status and status.lower() != "valid":
-                            _log.warning(
-                                "Server %d accepted fragment %d for block %s "
-                                "but reported verification_status=%r.",
-                                server.server_id,
-                                fragment.index,
-                                block_id,
-                                status,
-                            )
-                    except ValueError:
-                        pass
-                    return True
-                return False
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.put(
+                        self._server_url(server, fragment.block_id, fragment.index),
+                        json=request_body.model_dump(),
+                    )
+                    return response.status_code == 200
             except httpx.RequestError:
                 return False
 
-        async def disperse() -> int:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                results = await asyncio.gather(
-                    *(
-                        post_fragment(client, server, fragment)
-                        for server, fragment in zip(self.servers, fragments)
-                    )
-                )
-            return sum(results)
+        successes = 0
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [
+                pool.submit(_put_one, server, fragment)
+                for server, fragment in zip(self.servers, fragments)
+            ]
+            for future in as_completed(futures):
+                if future.result():
+                    successes += 1
 
-        success_count = asyncio.run(disperse())
-        if success_count < self.m:
+        if successes < self.m:
             raise DispersalError(
-                f"Dispersal failed: only {success_count}/{len(self.servers)} servers accepted fragments; need at least {self.m}."
+                f"Dispersal failed: only {successes}/{len(self.servers)} servers accepted fragments."
             )
-        return block_id
+
+        return fragments[0].block_id
 
     def get(self, block_id: str) -> bytes:
         """Retrieve and reconstruct the original data for a block.
@@ -204,144 +159,74 @@ class VeriStoreClient:
             RetrievalError: If fewer than m fragments can be retrieved or
                             verified.
         """
-        async def get_fragment(
-            client: httpx.AsyncClient,
-            server: ServerAddress,
-            index: int,
-        ) -> dict | None:
+
+        def _get_one(server: ServerAddress, index: int) -> GetFragmentResponse | None:
             try:
-                response = await client.get(
-                    self._server_url(server, block_id, index)
-                )
-                if not response.is_success:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.get(self._server_url(server, block_id, index))
+                if response.status_code != 200:
                     return None
-                return response.json()
-            except (httpx.RequestError, ValueError):
+                return GetFragmentResponse.model_validate(response.json())
+            except (httpx.RequestError, ValidationError, ValueError):
                 return None
-            
-        async def retrieve_fragments() -> list[dict]:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                responses = await asyncio.gather(
-                    *(
-                        get_fragment(client, server, index)
-                        for index, server in enumerate(self.servers)
-                    )
-                )
-            return [response for response in responses if response is not None]
-        
-        fragment_responses = asyncio.run(retrieve_fragments())
 
-        if len(fragment_responses) < self.m:
+        successful_responses: list[GetFragmentResponse] = []
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [
+                pool.submit(_get_one, server, index)
+                for index, server in enumerate(self.servers)
+            ]
+            for future in as_completed(futures):
+                response_model = future.result()
+                if response_model is not None:
+                    successful_responses.append(response_model)
+
+        if not successful_responses:
+            raise RetrievalError("Retrieval failed: no servers returned a fragment.")
+
+        base_fpcc_json = successful_responses[0].fpcc_json
+
+        try:
+            fpcc = FingerprintedCrossChecksum.from_json(base_fpcc_json)
+        except Exception as exc:  # pragma: no cover - defensive parse guard
             raise RetrievalError(
-                f"Retrieval failed: only {len(fragment_responses)}/{len(self.servers)} servers responded with fragments; need at least {self.m}."
-            )
-        
-        # Build a digest → (fpcc, count) map across all responses.
-        # A Byzantine server could return a tampered fpcc to poison verification,
-        # so we use the fpcc whose digest is shared by the most servers (majority
-        # vote) rather than blindly trusting the first one we can parse.
-        fpcc_votes: dict[str, tuple[FingerprintedCrossChecksum, int]] = {}
-        for response in fragment_responses:
+                f"Retrieval failed: invalid fpcc from server response ({exc})."
+            ) from exc
+
+        verified_fragments: list[Fragment] = []
+        for response_model in successful_responses:
+            if response_model.fpcc_json != base_fpcc_json:
+                continue
             try:
-                candidate = FingerprintedCrossChecksum.from_json(response["fpcc_json"])
-                d = candidate.digest()
-                if d in fpcc_votes:
-                    fpcc_votes[d] = (fpcc_votes[d][0], fpcc_votes[d][1] + 1)
-                else:
-                    fpcc_votes[d] = (candidate, 1)
-            except (KeyError, ValueError, TypeError):
+                fragment_bytes = base64.b64decode(response_model.fragment_data)
+            except Exception:
+                continue
+            report = Verifier.check(response_model.index, fragment_bytes, fpcc)
+            if report.result != VerificationResult.CONSISTENT:
                 continue
 
-        if not fpcc_votes:
-            raise RetrievalError(
-                "Retrieval failed: no valid fpcc found in server responses; cannot verify fragments."
-            )
-
-        fpcc_digest, (fpcc, fpcc_count) = max(
-            fpcc_votes.items(), key=lambda item: item[1]
-        )
-
-        if len(fpcc_votes) > 1:
-            _log.warning(
-                "fpcc mismatch across servers for block %s: %d distinct fpccs received. "
-                "Using fpcc supported by %d/%d servers (digest %s).",
-                block_id,
-                len(fpcc_votes),
-                fpcc_count,
-                len(fragment_responses),
-                fpcc_digest[:16],
-            )
-
-        # Build the list of verified fragments until either every fragment is tested or we have m verified fragments.
-        verified_fragments = []
-
-        for response in fragment_responses:
-            try:
-                fragment_data = base64.b64decode(response["fragment_data"])
-                index = response["index"]
-            except (KeyError, ValueError, TypeError):
-                continue
-
-            # Advisory check: log if the server's own stored status is not valid.
-            # We still run independent re-verification below, but a server-reported
-            # INVALID is a strong signal of a Byzantine or corrupted fragment.
-            server_status = response.get("verification_status", "")
-            if server_status and server_status.lower() != "valid":
-                _log.warning(
-                    "Server reported verification_status=%r for fragment %d of block %s; "
-                    "running independent re-verification.",
-                    server_status,
-                    index,
-                    block_id,
+            verified_fragments.append(
+                Fragment(
+                    index=response_model.index,
+                    data=fragment_bytes,
+                    block_id=response_model.block_id,
+                    total_n=response_model.total_n,
+                    threshold_m=response_model.threshold_m,
+                    original_length=response_model.original_length,
                 )
-
-            # Skip fragments whose accompanying fpcc doesn't match the majority.
-            # A mismatched fpcc means either the server tampered with it or is
-            # Byzantine; either way this fragment cannot be safely verified.
-            try:
-                response_fpcc_digest = FingerprintedCrossChecksum.from_json(
-                    response["fpcc_json"]
-                ).digest()
-                if response_fpcc_digest != fpcc_digest:
-                    _log.warning(
-                        "Skipping fragment %d of block %s: server returned "
-                        "mismatched fpcc (digest %s != majority %s).",
-                        index,
-                        block_id,
-                        response_fpcc_digest[:16],
-                        fpcc_digest[:16],
-                    )
-                    continue
-            except (KeyError, ValueError, TypeError):
-                # No parseable fpcc in this response; still verify against the
-                # majority fpcc (the fragment data itself may be fine).
-                pass
-
-            # Verify the fragment against the majority fpcc.
-            verification_report = Verifier.check(index, fragment_data, fpcc)
-
-            if verification_report.result == VerificationResult.CONSISTENT:
-                fragment = Fragment(
-                    index=response["index"],
-                    data=fragment_data,
-                    block_id=block_id,
-                    total_n=fpcc.n,
-                    threshold_m=fpcc.m,
-                    original_length=response["original_length"],
-                )
-                verified_fragments.append(fragment)
-
-
+            )
             if len(verified_fragments) >= self.m:
                 break
 
         if len(verified_fragments) < self.m:
             raise RetrievalError(
-                f"Retrieval failed: only {len(verified_fragments)}/{len(fragment_responses)} fragments verified as consistent; need at least {self.m}."
+                f"Retrieval failed: only {len(verified_fragments)} verified fragments available; need {self.m}."
             )
 
-        return decode(verified_fragments)
-
+        try:
+            return decode(verified_fragments)
+        except Exception as exc:
+            raise RetrievalError(f"Retrieval failed during decode: {exc}") from exc
 
     def delete(self, block_id: str) -> None:
         """Request deletion of a stored block from all servers.
@@ -352,49 +237,33 @@ class VeriStoreClient:
         Args:
             block_id: The key of the block to delete.
         """
-        async def delete_fragment(
-            client: httpx.AsyncClient,
-            server: ServerAddress,
-            index: int,
-        ) -> None:
+        def _delete_one(server: ServerAddress, index: int) -> None:
             try:
-                response = await client.delete(self._server_url(server, block_id, index))
-
-                # A missing fragment is expected here: it may never have been stored
-                # or may already have been removed by an earlier delete.
-                if response.status_code == 404:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.delete(self._server_url(server, block_id, index))
+                if response.status_code in (200, 404):
                     return
-
-                # Log non-404 failures for visibility, but keep delete best-effort
-                # so one bad server does not fail the whole client call.
-                if not response.is_success:
-                    _log.warning(
-                        "DELETE failed for block %s fragment %d on server %d: HTTP %d",
-                        block_id,
-                        index,
-                        server.server_id,
-                        response.status_code,
-                    )
-            except httpx.RequestError as exc:
-                # Network issues are unexpected, but deletion remains best-effort.
                 _log.warning(
-                    "DELETE request error for block %s fragment %d on server %d: %s",
-                    block_id,
-                    index,
+                    "DELETE unexpected status from server %s (%s): %s",
                     server.server_id,
+                    self._server_url(server, block_id, index),
+                    response.status_code,
+                )
+            except httpx.RequestError as exc:
+                _log.warning(
+                    "DELETE request error for server %s (%s): %s",
+                    server.server_id,
+                    self._server_url(server, block_id, index),
                     exc,
                 )
 
-        async def delete_all_fragments() -> None:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                await asyncio.gather(
-                    *(
-                        delete_fragment(client, server, index)
-                        for index, server in enumerate(self.servers)
-                    )
-                )
-
-        asyncio.run(delete_all_fragments())
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [
+                pool.submit(_delete_one, server, index)
+                for index, server in enumerate(self.servers)
+            ]
+            for future in as_completed(futures):
+                future.result()
 
     def health_check(self) -> dict[int, bool]:
         """Ping all servers and return their availability.
@@ -402,36 +271,21 @@ class VeriStoreClient:
         Returns:
             A dict mapping server_id -> True (healthy) / False (unreachable).
         """
-        async def check_server(
-            client: httpx.AsyncClient,
-            server: ServerAddress,
-        ) -> tuple[int, bool]:
+        def _health_one(server: ServerAddress) -> tuple[int, bool]:
             try:
-                # Probe this server's health endpoint directly; a healthy server
-                # should respond with HTTP 200 and a JSON body containing status="ok".
-                response = await client.get(f"{server.base_url}/health")
-                if not response.is_success:
-                    return server.server_id, False
-
-                # Treat any non-"ok" status as unhealthy even if the endpoint responds.
-                payload = response.json()
-                return server.server_id, payload.get("status") == "ok"
-            except (httpx.RequestError, ValueError):
-                # Network failures and malformed responses both count as unhealthy.
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.get(f"{server.base_url}/health")
+                return server.server_id, response.status_code == 200
+            except httpx.RequestError:
                 return server.server_id, False
 
-        async def check_all_servers() -> dict[int, bool]:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Check every server concurrently so one slow server does not
-                # delay the rest of the availability results.
-                results = await asyncio.gather(
-                    *(check_server(client, server) for server in self.servers)
-                )
-            # Convert the list of (server_id, healthy) pairs into the API's
-            # expected return shape.
-            return dict(results)
-
-        return asyncio.run(check_all_servers())
+        results: dict[int, bool] = {}
+        with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
+            futures = [pool.submit(_health_one, server) for server in self.servers]
+            for future in as_completed(futures):
+                server_id, healthy = future.result()
+                results[server_id] = healthy
+        return results
 
     def _server_url(self, server: ServerAddress, block_id: str, index: int) -> str:
         """Build the fragment endpoint URL for a given server.
@@ -445,6 +299,7 @@ class VeriStoreClient:
             Full URL string, e.g. "http://localhost:5001/fragments/abc123/0".
         """
         return f"{server.base_url}/fragments/{block_id}/{index}"
+
 
 class DispersalError(RuntimeError):
     """Raised when fewer than m servers acknowledged a PUT."""

@@ -19,8 +19,6 @@ References:
 
 from __future__ import annotations
 
-from src.verification.oracle import RandomOracle
-
 from .field import GF256
 from .polynomial import Polynomial
 
@@ -59,6 +57,8 @@ def random_point(seed: bytes) -> GF256:
     Returns:
         A GF256 element to use as the fingerprint evaluation point.
     """
+    from src.verification.oracle import RandomOracle
+
     counter = 0
 
     while True:

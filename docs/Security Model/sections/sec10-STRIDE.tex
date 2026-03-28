@@ -65,18 +65,24 @@
 
 \subsubsection{R.1: Anonymous Data Storage}
 
-% THREAT: An attacker stores large amounts of data without accountability, potentially consuming
-% storage resources or storing illegal content.
+An unauthenticated actor can submit arbitrary blocks without a durable identity binding.
+If abuse occurs (for example, storing prohibited content or intentionally filling capacity),
+operators cannot reliably attribute actions to a specific principal, weakening accountability
+and incident response.
 
 \subsubsection{R.2: Fragment Deletion Without Logging}
 
-% THREAT: A compromised server deletes fragments without creating audit records, making it
-% impossible to trace data loss to specific servers.
+A compromised or misconfigured storage server can delete local fragments and return standard
+HTTP error responses later, while leaving little or no tamper-evident audit trail. In that
+case, the system can observe data loss but cannot prove which server performed the deletion
+or when the deletion occurred.
 
 \subsubsection{R.3: Untrackable Verification Failures}
 
-% THREAT: When verification fails, the system cannot determine which server provided corrupted
-% data, allowing malicious servers to evade detection.
+When the client receives inconsistent fragment responses, weak request correlation and
+insufficiently structured logs can make it difficult to attribute corruption to a specific
+server instance over time. This enables a Byzantine server to intermittently misbehave while
+plausibly denying responsibility.
 
 \subsection{Information Disclosure}
 
@@ -87,23 +93,29 @@
 
 \subsubsection{I.1: Fragment Eavesdropping}
 
-% THREAT: A network attacker intercepts fragments in transit and reconstructs the original block
-% if they capture at least m fragments.
+An on-path attacker observing client-to-server traffic can capture fragment payloads in transit.
+If the attacker collects at least $m$ fragments for the same block, they can reconstruct the
+original plaintext object because erasure coding provides redundancy, not confidentiality.
 
 \subsubsection{I.2: Storage Server Data Access}
 
-% THREAT: A compromised storage server reads all fragments it stores, potentially learning
-% partial information about data blocks.
+A storage server operator (or a host compromise) can read fragment files at rest directly from
+disk. Although one server typically holds only one fragment per block, repeated observation
+across many blocks still discloses user data patterns and potentially sensitive content.
 
 \subsubsection{I.3: Fingerprint Analysis}
 
-% THREAT: An attacker analyzes fingerprints to infer information about data content, though
-% fingerprints are designed to reveal minimal information.
+An attacker who collects cross-checksum material (hashes, fingerprints, and metadata) can run
+offline analysis to correlate uploads, infer duplicate content patterns, or support dictionary
+style guessing against predictable objects. While fingerprints are not raw data, metadata leakage
+still increases attacker knowledge about stored content.
 
 \subsubsection{I.4: Error Message Information Leakage}
 
-% THREAT: Verbose error messages reveal internal system state, cryptographic parameters, or
-% fragment locations that could aid attacks.
+Verbose API errors and debug logs may expose internal identifiers, verification outcomes,
+fragment indices, and topology details (server IDs and ports). This information can be used by
+attackers to target specific nodes, optimize denial-of-service behavior, or refine tampering
+attempts.
 
 \subsection{Denial of Service}
 

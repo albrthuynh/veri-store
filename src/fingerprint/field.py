@@ -186,7 +186,9 @@ class GF256:
 # ---------------------------------------------------------------------------
 
 
-def build_exp_log_tables(poly: int = IRREDUCIBLE_POLY) -> tuple[list[int], list[int]]:
+def build_exp_log_tables(
+    poly: int = IRREDUCIBLE_POLY, generator: int = 0x03
+) -> tuple[list[int], list[int]]:
     """Pre-compute exponentiation and logarithm tables for GF(2^8).
 
     These tables make multiplication O(1) via exp/log lookup:
@@ -203,13 +205,26 @@ def build_exp_log_tables(poly: int = IRREDUCIBLE_POLY) -> tuple[list[int], list[
     exp_table = [0] * 256
     log_table = [0] * 256
 
+    def _mul_mod(a: int, b: int) -> int:
+        result = 0
+        x = a
+        y = b
+        while y > 0:
+            if y & 1:
+                result ^= x
+            y >>= 1
+            x <<= 1
+            if x & 0x100:
+                x ^= poly
+        return result & 0xFF
+
     x = 1
     for i in range(255):
         exp_table[i] = x
         log_table[x] = i
-        x <<= 1
-        if x & 0x100:
-            x ^= IRREDUCIBLE_POLY
+        # Use a primitive generator so powers enumerate all 255 non-zero values.
+        # In the AES field (poly=0x11B), 0x03 is primitive while 0x02 is not.
+        x = _mul_mod(x, generator)
 
     exp_table[255] = 1
 

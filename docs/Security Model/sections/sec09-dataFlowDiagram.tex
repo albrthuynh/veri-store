@@ -52,48 +52,65 @@
 
 \subsubsection{Client}
 
-% COMMENT: External entity representing the user or application storing/retrieving data. Operates
-% at "authenticated client" trust level. Assumed to be benign but may have bugs.
+The Client is the entry-point process that initiates store (PUT) and retrieve (GET) operations.
+It is trusted to run the veri-store protocol correctly, but it is still treated as a software
+component that can fail due to bugs or operator error. For writes, the Client invokes encoding,
+computes the fingerprinted cross-checksum (fpcc), and dispatches fragments to storage servers.
+For reads, it gathers candidate fragments, verifies them locally, and only then reconstructs the
+original block. This placement makes the Client the final integrity decision point.
 
 \subsubsection{Encode Block}
 
-% COMMENT: Trusted process that implements Reed-Solomon erasure coding. Takes original block,
-% produces n fragments such that any m can reconstruct the original. Must correctly implement
-% the encoding algorithm to ensure fragments are valid.
+Encode Block is a trusted process that converts an input data block into $n$ Reed-Solomon
+fragments with threshold $m$ (for this project, typically 3-of-5). The process pads input,
+computes coded fragments, and tags each fragment with metadata (index, block id, $n$, $m$, and
+original length). Its security role is correctness: if encoding is wrong, availability and
+integrity both degrade because reconstruction may fail or produce incorrect bytes.
 
 \subsubsection{Compute Fingerprint}
 
-% COMMENT: Trusted process that generates homomorphic fingerprints for each fragment using division
-% fingerprinting over F_256. Must use cryptographically secure random parameter r and correctly
-% compute fingerprints to ensure collision resistance.
+Compute Fingerprint is a trusted process that builds the fpcc structure used for integrity
+verification. It computes per-fragment hash commitments and homomorphic fingerprints (for indices
+below $m$), and derives challenge point $r$ via the random-oracle construction from fragment
+hashes. The output fpcc binds fragments to a single logical block and enables later detection of
+tampered, stale, or mismatched fragment responses.
 
 \subsubsection{Distribute Fragments}
 
-% COMMENT: Trusted process that sends fragments and fingerprints to storage servers. Handles
-% network communication and retries. May need to authenticate servers to prevent MITM attacks.
+Distribute Fragments is a trusted client-side networking process that sends each fragment and the
+shared fpcc to its designated server endpoint. It runs requests in parallel, applies timeout
+bounds, and treats server failures as expected partial-fault behavior. The process succeeds only
+if at least $m$ servers acknowledge storage, preserving the threshold availability assumption.
 
 \subsubsection{Network}
 
-% COMMENT: Untrusted external entity representing network infrastructure. Adversary may observe,
-% modify, or inject messages. Protection via authentication (TLS) or message authentication codes
-% may be needed.
+Network is explicitly untrusted. An adversary may delay, drop, replay, reorder, or modify packets,
+and may make individual servers appear unavailable. The design therefore does not rely on network
+honesty for integrity: retrieved data is always re-verified against fpcc before decode. Timeouts
+and best-effort fan-out/fan-in behavior are used so the client can tolerate partial outages.
 
 \subsubsection{Fragment Storage}
 
-% COMMENT: Semi-trusted data store representing persistent storage on servers. Stores fragments
-% and fingerprints. Servers may fail or return corrupted data but are detected via verification.
-% Storage is assumed to be persistent but not necessarily confidential.
+Fragment Storage represents server-local persistent stores that hold fragment bytes and associated
+metadata. It is semi-trusted for durability but not for integrity: servers can crash, lose state,
+or return corrupted values. The threat model assumes these failures are detectable by client-side
+verification and threshold reconstruction, rather than prevented by fully trusted storage nodes.
 
 \subsubsection{Verify Fragments}
 
-% COMMENT: Trusted process that validates fragment integrity using homomorphic fingerprints.
-% Retrieves fragments and fingerprints from storage, performs cross-checksum verification to
-% detect corrupted or forged fragments. Rejects invalid fragments.
+Verify Fragments is a trusted process that checks each retrieved fragment against fpcc before it is
+eligible for decode. Verification first checks the fragment hash commitment and then (for indices
+below $m$) checks the homomorphic fingerprint equation. Any fragment that fails consistency checks,
+has malformed encoding, or disagrees on fpcc context is rejected. This step provides integrity
+filtering under Byzantine or unreliable server behavior.
 
 \subsubsection{Reconstruct Block}
 
-% COMMENT: Trusted process that decodes original block from m valid fragments using Reed-Solomon
-% decoding. Only operates on verified fragments to ensure integrity of reconstructed data.
+Reconstruct Block is a trusted decoding process that rebuilds the original data from any $m$
+verified fragments using Reed-Solomon decode. It runs only after the verification phase has
+accepted enough fragments, then removes padding to recover the original byte length. Security-wise,
+this enforces a strict pipeline: no unverified fragment is allowed to influence reconstructed
+output.
 
 \newpage
 \end{document}
