@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
@@ -40,6 +41,9 @@ from src.verification.verifier import VerificationResult, Verifier
 
 _log = logging.getLogger(__name__)
 
+# These can be added to VeriStoreClient.__init__ if desired, but will hardcode for now.
+_MAX_ATTEMPTS = 3  # Max attempts allowed for transient HTTP failures
+_BACKOFF = 0.5  # Backoff time in seconds between retries
 
 @dataclass
 class ServerAddress:
@@ -94,6 +98,32 @@ class VeriStoreClient:
         self.m = m
         self.timeout = timeout
 
+    def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        *,
+        json: dict | None = None,
+    ) -> httpx.Response | None:
+        """Helper method to send an HTTP request with retry logic for transient failures."""
+        delay = _BACKOFF
+
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                with httpx.Client(timeout=self.timeout) as http:
+                    response = http.request(method, url, json=json)
+                
+                if response.status_code < 500:
+                    return response
+            except httpx.RequestError:
+                pass
+
+            if attempt < _MAX_ATTEMPTS - 1:
+                time.sleep(delay)
+                delay = delay + _BACKOFF
+        
+        return None
+
     def put(self, block_id: str, data: bytes) -> str:
         """Encode data and disperse fragments to all servers.
 
@@ -119,15 +149,24 @@ class VeriStoreClient:
                 original_length=fragment.original_length,
                 fpcc_json=fpcc_json,
             )
-            try:
-                with httpx.Client(timeout=self.timeout) as http:
-                    response = http.put(
-                        self._server_url(server, fragment.block_id, fragment.index),
-                        json=request_body.model_dump(),
-                    )
-                    return response.status_code == 200
-            except httpx.RequestError:
+            # try:
+            #     with httpx.Client(timeout=self.timeout) as http:
+            #         response = http.put(
+            #             self._server_url(server, fragment.block_id, fragment.index),
+            #             json=request_body.model_dump(),
+            #         )
+            #         return response.status_code == 200
+            # except httpx.RequestError:
+            #     return False
+            response = self._request_with_retry(
+                "PUT",
+                self._server_url(server, fragment.block_id, fragment.index),
+                json=request_body.model_dump(),
+            )
+
+            if response is None: # All retries failed
                 return False
+            return response.status_code == 200
 
         successes = 0
         with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
@@ -161,13 +200,26 @@ class VeriStoreClient:
         """
 
         def _get_one(server: ServerAddress, index: int) -> GetFragmentResponse | None:
+            # try:
+            #     with httpx.Client(timeout=self.timeout) as http:
+            #         response = http.get(self._server_url(server, block_id, index))
+            #     if response.status_code != 200:
+            #         return None
+            #     return GetFragmentResponse.model_validate(response.json())
+            # except (httpx.RequestError, ValidationError, ValueError):
+            #     return None
+            
+            response = self._request_with_retry(
+                "GET",
+                self._server_url(server, block_id, index),
+            )
+
+            if response is None or response.status_code != 200: # All retries failed or non-200 response
+                return None
+            
             try:
-                with httpx.Client(timeout=self.timeout) as http:
-                    response = http.get(self._server_url(server, block_id, index))
-                if response.status_code != 200:
-                    return None
                 return GetFragmentResponse.model_validate(response.json())
-            except (httpx.RequestError, ValidationError, ValueError):
+            except (ValidationError, ValueError):
                 return None
 
         successful_responses: list[GetFragmentResponse] = []
@@ -238,24 +290,46 @@ class VeriStoreClient:
             block_id: The key of the block to delete.
         """
         def _delete_one(server: ServerAddress, index: int) -> None:
-            try:
-                with httpx.Client(timeout=self.timeout) as http:
-                    response = http.delete(self._server_url(server, block_id, index))
-                if response.status_code in (200, 404):
-                    return
+            # try:
+            #     with httpx.Client(timeout=self.timeout) as http:
+            #         response = http.delete(self._server_url(server, block_id, index))
+            #     if response.status_code in (200, 404):
+            #         return
+            #     _log.warning(
+            #         "DELETE unexpected status from server %s (%s): %s",
+            #         server.server_id,
+            #         self._server_url(server, block_id, index),
+            #         response.status_code,
+            #     )
+            # except httpx.RequestError as exc:
+            #     _log.warning(
+            #         "DELETE request error for server %s (%s): %s",
+            #         server.server_id,
+            #         self._server_url(server, block_id, index),
+            #         exc,
+            #     )
+            response = self._request_with_retry(
+                "DELETE",
+                self._server_url(server, block_id, index)
+            )
+
+            if response is None:
                 _log.warning(
-                    "DELETE unexpected status from server %s (%s): %s",
+                    "Delete request failed after retries for server %s (%s).",
                     server.server_id,
                     self._server_url(server, block_id, index),
-                    response.status_code,
                 )
-            except httpx.RequestError as exc:
-                _log.warning(
-                    "DELETE request error for server %s (%s): %s",
-                    server.server_id,
-                    self._server_url(server, block_id, index),
-                    exc,
-                )
+                return
+
+            if response.status_code in (200, 404):
+                return
+            
+            _log.warning(
+                "Delete unexpected status from server %s (%s): %s",
+                server.server_id,
+                self._server_url(server, block_id, index),
+                response.status_code,
+            )
 
         with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
             futures = [
@@ -272,12 +346,20 @@ class VeriStoreClient:
             A dict mapping server_id -> True (healthy) / False (unreachable).
         """
         def _health_one(server: ServerAddress) -> tuple[int, bool]:
-            try:
-                with httpx.Client(timeout=self.timeout) as http:
-                    response = http.get(f"{server.base_url}/health")
-                return server.server_id, response.status_code == 200
-            except httpx.RequestError:
+            # try:
+            #     with httpx.Client(timeout=self.timeout) as http:
+            #         response = http.get(f"{server.base_url}/health")
+            #     return server.server_id, response.status_code == 200
+            # except httpx.RequestError:
+            #     return server.server_id, False
+            response = self._request_with_retry(
+                "GET",
+                f"{server.base_url}/health",
+            )
+            if response is None:
                 return server.server_id, False
+            
+            return server.server_id, response.status_code == 200
 
         results: dict[int, bool] = {}
         with ThreadPoolExecutor(max_workers=len(self.servers)) as pool:
