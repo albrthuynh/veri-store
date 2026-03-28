@@ -249,7 +249,7 @@ class VeriStoreClient:
         for response_model in successful_responses:
             if response_model.fpcc_json != base_fpcc_json:
                 _log.warning(
-                    "FPCC mismatch in server response for block_id %s, index %d; skipping fragment.",
+                    "FPCC mismatch in server response for block_id %s, index %d; fragment untrusted, skipping.",
                     block_id,
                     response_model.index,
                 )
@@ -259,7 +259,7 @@ class VeriStoreClient:
                 fragment_bytes = base64.b64decode(response_model.fragment_data)
             except Exception:
                 _log.warning(
-                    "Failed to decode fragment data for block_id %s, index %d.",
+                    "Malformed fragment data in server response for block_id %s, index %d.",
                     block_id,
                     response_model.index,
                 )
