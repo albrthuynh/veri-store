@@ -118,8 +118,8 @@
 
 - [X] Implement client-side security checks
 - [X] Verify server responses contain valid signatures
-- [ ] Implement retry logic for failed requests
-- [ ] Add logging for security events (verification failures)
+- [X] Implement retry logic for failed requests
+- [X] Add logging for security events (verification failures)
 - [ ] **Security Model §8.1:** Write Data Blocks protected asset
 - [ ] **Security Model §8.2:** Write Erasure-Coded Fragments protected asset
 - [ ] **Security Model §8.3:** Write Homomorphic Fingerprints protected asset

@@ -248,13 +248,32 @@ class VeriStoreClient:
         verified_fragments: list[Fragment] = []
         for response_model in successful_responses:
             if response_model.fpcc_json != base_fpcc_json:
+                _log.warning(
+                    "FPCC mismatch in server response for block_id %s, index %d; skipping fragment.",
+                    block_id,
+                    response_model.index,
+                )
                 continue
+
             try:
                 fragment_bytes = base64.b64decode(response_model.fragment_data)
             except Exception:
+                _log.warning(
+                    "Failed to decode fragment data for block_id %s, index %d.",
+                    block_id,
+                    response_model.index,
+                )
                 continue
             report = Verifier.check(response_model.index, fragment_bytes, fpcc)
             if report.result != VerificationResult.CONSISTENT:
+                _log.warning(
+                    "Verification FAILED for fragment (%s, %d): "
+                    "result=%s  detail=%s",
+                    block_id,
+                    response_model.index,
+                    report.result.value,
+                    report.detail,
+                )
                 continue
 
             verified_fragments.append(
