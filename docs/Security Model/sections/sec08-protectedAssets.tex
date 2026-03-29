@@ -2,37 +2,116 @@
 
 \begin{document}
 \section{Protected Assets}
-
-% COMMENT: Identify all resources that must be protected from harm. These are the things an
-% attacker will try to steal, modify, or disrupt. For each asset, specify what trust levels
-% should have access to it and what properties must be maintained (confidentiality, integrity,
-% availability). Examples: original data blocks, erasure-coded fragments, homomorphic fingerprints,
-% cryptographic keys (if used), server resources (CPU, memory, disk).
+For the below items, we will examine:
+\begin{itemize}[topsep=-0.5em]
+    \item Trust levels
+    \item Confidentiality
+    \item Integrity
+    \item Availability
+\end{itemize}
 
 \subsection{Data Blocks}
+\vspace{-1em}
+\subsubsection{Trust Levels}
 
-% COMMENT: Original data blocks submitted by clients. Primary security concern is integrity:
-% ensuring retrieved data matches what was stored. Confidentiality may be out of scope if
-% encryption is handled separately. Availability depends on having at least m of n fragments
-% available.
+\vspace{-1.5em}
+The original data blocks shall only be accessible to
+\begin{enumerate}[label=\alph*), topsep=-0.5em, noitemsep]
+    \item the user who uploaded it and
+    \item server administrators.
+\end{enumerate}
+
+\subsubsection{Confidentiality}
+\vspace{-1.5em}
+In a production deployment, we would not want to trust the server \textendash{} the fragments would be encrypted in such a way that the server would not be able to read the underlying data. However, such encryption is beyond the scope of the current implementation.
+
+Our current implementation only accounts for a single user, so access control to data blocks is trivial. In a multi-user system, though, we would implement user IDs (stored as metadata with each fragment) and access tokens provided to users at login. The server confirms that the provided access token is associated with the user ID which has permission to access the data block.
+
+\subsubsection{Integrity}
+\vspace{-1.5em}
+The original data block uploaded by a user must be the same data returned to a user upon request, enforced through the use of homomorphic fingerprints. See section 8.3 for more details.
+
+\subsubsection{Availability}
+\vspace{-1.5em}
+Availability of a given data block is dependent on $m$ out of $n$ valid fragments being available. In the current implementation, $m=3$ and $n=5$.
 
 \subsection{Erasure-Coded Fragments}
+\vspace{-1em}
+\subsubsection{Trust Levels}
+\vspace{-1.5em}
+The erasure-coded fragments will only be accessible to server administrators, and accessible to clients only for the purpose of verification and reconstruction.
 
-% COMMENT: Individual fragments stored on servers. Must maintain integrity to ensure correct
-% reconstruction. Fragment authenticity is verified via homomorphic fingerprints. Loss of fewer
-% than n-m fragments should not compromise data availability.
+\subsubsection{Confidentiality}
+\vspace{-1.5em}
+Clients will be able to access erasure-coded fragments for the purpose of validating and rebuilding the original data block. However, they shall not be able to access fragments of data blocks which they did not upload. (See section 8.1.2, para. 2 for a fuller discussion.)
+
+As above, in a production deployment, we do not want server administrators to be able to access the data stored in a fragment; however, the encryption is beyond the scope of our current implementation.
+
+\subsubsection{Integrity}
+\vspace{-1.5em}
+Servers should not be able to change any part of the data fragment. Otherwise, the original data block cannot be reconstructed.
+
+Unfortunately, the integrity of individual fragments cannot be guaranteed. A compromised server can still modify a stored fragment, although any such tampering will be detected by the homomorphic fingerprinting scheme before the fragment is used for reconstruction. This prevents corrupted (and possibly malicious) data from being included in the reconstructed block.
+
+\subsubsection{Availability}
+\vspace{-1.5em}
+At least $m$ fragments must be available to reconstruct the original data block. For our implementation, that means $n - m = 2$ fragments can be unavailable and the original data block can still be reconstructed.
 
 \subsection{Homomorphic Fingerprints}
+\vspace{-1em}
+\subsubsection{Trust Levels}
+\vspace{-1.5em}
 
-% COMMENT: Compact cryptographic checksums that preserve erasure code structure. Critical for
-% integrity verification. Must be protected from tampering and forgery. Fingerprints themselves
-% don't reveal data content but must be authentic.
+In our current implementation, server administrators have access to view and possibly modify the stored fingerprints. Clients have access to view fingerprints for the purposes of fragment verification.
+
+\subsubsection{Confidentiality}
+\vspace{-1.5em}
+
+In a production deployment, fingerprints should be encrypted while on the server to prevent such tampering. However, such encryption is out of the scope of our current implementation.
+
+While fingerprints themselves do not reveal any information, an adversary who collects them can confirm if suspected data is stored in a fragment.
+
+\subsubsection{Integrity}
+\vspace{-1.5em}
+
+If the underlying fragment is tampered with, the resulting fingerprint will be changed. This change will be detected during the verification process and the associated fragment not used for block reconstruction.
+
+However, if an adversary can modify both the fragment and the stored fingerprint in a consistent manner, the tampering would go undetected. The collision resistance of the fingerprinting scheme makes forging a consistent fingerprint computationally infeasible. This is a known limitation and is not fully mitigated in our implementation.
+
+\subsubsection{Availability}
+\vspace{-1.5em}
+
+Fingerprints are calculated from the fragments and occur as two types: 
+\begin{enumerate}
+    \item the fingerprints stored alongside the fragments at upload  
+    \item and the fingerprint calculated from a fragment during the verification process
+\end{enumerate}
+
+For the first: so long as the \texttt{fpcc} is available, the stored fingerprints will be available. For the second, so long as the fragment is available, the fingerprint can be calculated.
 
 \subsection{System Resources}
+\vspace{-1em}
+\subsubsection{Trust Levels}
+\vspace{-1.5em}
 
-% COMMENT: Server computational resources (CPU, memory, disk space, network bandwidth). Attackers
-% should not be able to exhaust these resources and cause denial of service. Resource consumption
-% should be proportional to legitimate usage.
+Server administrators have full access to system resources. Authenticated clients consume resources proportional to their requests (e.g., storage, retrieval, and verification operations).
+
+\subsubsection{Confidentiality}
+\vspace{-1.5em}
+
+Resource usage metrics (e.g., CPU, memory, disk, bandwidth) should not be exposed to clients, as this information could be used to infer system capacity or identify optimal timing for DoS attacks.
+
+\subsubsection{Integrity}
+\vspace{-1.5em}
+
+Resource consumption should be proportional to legitimate usage. A client should not be able to trigger disproportionate resource consumption through malformed or malicious requests — for example, sending a request that causes the server to perform unbounded computation or allocate unbounded memory.
+
+\subsubsection{Availability}
+\vspace{-1.5em}
+
+System resources must remain available to service legitimate requests. The primary threat is denial of service — an adversary exhausting CPU, memory, disk space, or network bandwidth to prevent legitimate clients from storing or retrieving data. 
+
+In our current implementation, client-side retry limits (a maximum of 3 attempts) and linear backoff (delay increasing by 0.5 seconds every attempt) are in place, which partially mitigate resource exhaustion from repeated failed requests. However, rate limiting and request quotas are not fully implemented, leaving the system partially vulnerable to DoS attacks from high request volumes.
 
 \newpage
 \end{document}

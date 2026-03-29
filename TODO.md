@@ -120,10 +120,10 @@
 - [X] Verify server responses contain valid signatures
 - [X] Implement retry logic for failed requests
 - [X] Add logging for security events (verification failures)
-- [ ] **Security Model §8.1:** Write Data Blocks protected asset
-- [ ] **Security Model §8.2:** Write Erasure-Coded Fragments protected asset
-- [ ] **Security Model §8.3:** Write Homomorphic Fingerprints protected asset
-- [ ] **Security Model §8.4:** Write System Resources protected asset
+- [X] **Security Model §8.1:** Write Data Blocks protected asset
+- [X] **Security Model §8.2:** Write Erasure-Coded Fragments protected asset
+- [X] **Security Model §8.3:** Write Homomorphic Fingerprints protected asset
+- [X] **Security Model §8.4:** Write System Resources protected asset
 
 #### Albert (Systems/Backend)
 
