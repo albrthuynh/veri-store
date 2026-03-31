@@ -187,9 +187,9 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Implement proper HTTP status codes (200, 404, 500, etc.)
-- [ ] Add error messages in responses (JSON error objects)
-- [ ] Implement idempotency for PUT requests
+- [x] Implement proper HTTP status codes (200, 404, 500, etc.)
+- [x] Add error messages in responses (JSON error objects)
+- [x] Implement idempotency for PUT requests
 - [ ] Add request/response logging
 - [ ] **Security Model §11.3:** Write Repudiation threat resolutions (R.1, R.2, R.3)
 - [ ] **Security Model §11.4:** Write Information Disclosure threat resolutions (I.1, I.2, I.3, I.4)

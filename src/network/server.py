@@ -21,33 +21,27 @@ Run a single server:
 """
 
 from __future__ import annotations
+
 import base64
 import logging
 import os
 from pathlib import Path as _Path
+
 from fastapi import FastAPI, HTTPException, Path
 
+from ..storage.fragment import FragmentRecord, VerificationStatus
+from ..storage.metadata import ObjectMetadata
+from ..storage.store import FragmentNotFoundError, FragmentStore
+from ..verification.cross_checksum import FingerprintedCrossChecksum
+from ..verification.verifier import VerificationResult, Verifier
 from .protocol import (
+    DeleteFragmentResponse,
+    GetFragmentResponse,
+    HealthResponse,
     StoreFragmentRequest,
     StoreFragmentResponse,
-    GetFragmentResponse,
-    DeleteFragmentResponse,
-    HealthResponse,
 )
-from ..storage.store import (
-    FragmentStore, 
-    FragmentNotFoundError,
-)
-from ..storage.fragment import (
-    FragmentRecord, 
-    VerificationStatus,
-)
-from ..storage.metadata import ObjectMetadata
-from ..verification.cross_checksum import FingerprintedCrossChecksum
-from ..verification.verifier import (
-    Verifier, 
-    VerificationResult,
-)
+from ..verification.oracle import RandomOracle
 
 # Module-level logger.  Each log message embeds server_id in the format
 # string so log lines from multiple server processes can be distinguished
@@ -58,6 +52,7 @@ _log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Application factory
 # ---------------------------------------------------------------------------
+
 
 def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
     """Create and configure the FastAPI application for one server instance.
@@ -101,7 +96,7 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
 
         # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
         fpcc_cache[(block_id, index)] = body.fpcc_json
-        return put_fragment(block_id, index, body, store, server_id)
+        return put_fragment(block_id, index, body, store, server_id, fpcc_cache)
 
     @app.get("/fragments/{block_id}/{index}")
     def _get(
@@ -114,7 +109,9 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
         # field overridden, leaving all other fields unchanged.
 
         # TODO: Update once FragmentRecord stores fpcc_json and the store is fully implemented.
-        return response.model_copy(update={"fpcc_json": fpcc_cache.get((block_id, index), "")})
+        return response.model_copy(
+            update={"fpcc_json": fpcc_cache.get((block_id, index), "")}
+        )
 
     @app.delete("/fragments/{block_id}/{index}")
     def _delete(
@@ -123,7 +120,7 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
     ) -> DeleteFragmentResponse:
         # Evict the cached fpcc_json when a fragment is deleted so the cache
         # does not grow without bound during long-running server sessions.
-    
+
         # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
         fpcc_cache.pop((block_id, index), None)
         return delete_fragment(block_id, index, store)
@@ -139,12 +136,14 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
 # Route handlers
 # ---------------------------------------------------------------------------
 
+
 def put_fragment(
     block_id: str,
     index: int,
     body: StoreFragmentRequest,
     store: FragmentStore,
     server_id: int,
+    fpcc_cache: dict[tuple[str, int], str],
 ) -> StoreFragmentResponse:
     """Handle PUT /fragments/{block_id}/{index}.
 
@@ -157,25 +156,57 @@ def put_fragment(
         body:     Validated request body.
         store:    The server's fragment store.
         server_id: This server's ID (for logging).
+        fpcc_cache: In-memory cache mapping (block_id, index) to fpcc_json strings, used for idempotency checks when fragments already exist.
 
     Returns:
         StoreFragmentResponse with the verification result.
 
     Raises:
         HTTPException(422): If fpcc verification fails.
-        HTTPException(409): If a fragment for this (block_id, index) already exists.
+        HTTPException(409): If a fragment for this (block_id, index) has different content.
     """
     # 1. Reject duplicates before doing any I/O.
-    #    The store is a write-once model: re-sending the same fragment is an
-    #    error rather than an idempotent update.
+    # The store is a write-once model: re-sending the same fragment is an error rather than an idempotent update.
+    # For idempotency, if a fragment has the same content -> 200 OK, if not -> 409 Conflict
     if store.has(block_id, index):
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Fragment ({block_id}, {index}) already exists "
-                f"on server {server_id}."
-            ),
+        stored = store.get(block_id, index)
+        cache_stored_fpcc = fpcc_cache.get((block_id, index))
+
+        # Check if all the data is the same
+        # Because if someone sends the same fragment data but with different erasure coding parameters, it's a completely different logical fragment
+        metadata_matches = (
+            stored.total_n == body.total_n
+            and stored.threshold_m == body.threshold_m
+            and stored.original_length == body.original_length
         )
+        fpcc_matches = cache_stored_fpcc == body.fpcc_json
+
+        try:
+            incoming_bytes = base64.b64decode(body.fragment_data)
+        except ValueError:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Fragment ({block_id}, {index}) exists with different data",
+            )
+
+        incoming_hash = RandomOracle.hash_fragment(incoming_bytes)
+        stored_hash = RandomOracle.hash_fragment(stored.data)
+        data_matches = incoming_hash == stored_hash
+
+        if metadata_matches and fpcc_matches and data_matches:
+            return StoreFragmentResponse(
+                block_id=block_id,
+                index=index,
+                verification_status=stored.verification_status.value,
+                message=f"Fragment ({block_id}, {index}) already stored (idempotent).",
+            )
+        else:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Fragment ({block_id}, {index}) already exists with different data"
+                ),
+            )
 
     # 2. Decode the fragment bytes from the base64 wire encoding.
     #    All binary data is transmitted as base64 strings because JSON cannot
@@ -261,6 +292,7 @@ def put_fragment(
         message=report.detail,
     )
 
+
 def get_fragment(
     block_id: str,
     index: int,
@@ -326,7 +358,9 @@ def delete_fragment(
         HTTPException(404): If the fragment is not found.
     """
     try:
-        store.delete(block_id, index) # At this time (3/15), store.delete() is not implemented.
+        store.delete(
+            block_id, index
+        )  # At this time (3/15), store.delete() is not implemented.
     except FragmentNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -342,7 +376,7 @@ def delete_fragment(
 
 def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
     """Handle GET /health. Confirms the server is running and attempts a lightweight
-    check of the fragment store. Not a comprehensive health check, but sufficient 
+    check of the fragment store. Not a comprehensive health check, but sufficient
     for Kubernetes liveness/readiness probes.
 
     Args:
@@ -355,7 +389,7 @@ def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
     status = "ok"
 
     try:
-        count = int(store.fragment_count()) 
+        count = int(store.fragment_count())
     except Exception:
         count = 0
         status = "failed"
