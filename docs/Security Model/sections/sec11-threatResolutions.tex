@@ -73,60 +73,60 @@
 
 \subsubsection{R.1: Anonymous Data Storage}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Accepted risk for academic prototype
+\item \textbf{Resolution}: The current implementation does not enforce authentication for HTTP endpoints, prioritizing simplicity for the course project scope. Production deployments would add an authentication layer (token-based or certificate-based) at the reverse proxy or API gateway to bind actions to authenticated principals. For the controlled laboratory environment, anonymous access is acceptable.
+\item \textbf{Owner}: Albert
+\item \textbf{Testing}: Manual verification that endpoints accept requests without authentication headers. For production systems, integration tests should verify that unauthenticated requests are rejected with HTTP 401 when authentication is enabled.
 \end{itemize}
 
 \subsubsection{R.2: Fragment Deletion Without Logging}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Already mitigated by request logging implementation
+\item \textbf{Resolution}: The FastAPI middleware logs all HTTP requests including DELETE operations in \texttt{src/network/server.py}, providing an audit trail with timestamps, server identity, fragment identifiers, and outcomes. Logs are written to standard output and can be aggregated to centralized log management systems for long-term retention.
+\item \textbf{Owner}: Albert
+\item \textbf{Testing}: Perform DELETE requests and verify that log messages appear for each operation with correct block\_id, index, and status code. Test suite should capture log output and assert that deletion events are properly recorded.
 \end{itemize}
 
 \subsubsection{R.3: Untrackable Verification Failures}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Already mitigated by verification failure logging
+\item \textbf{Resolution}: When fragment verification fails during PUT operations, the server logs detailed context at WARNING level in \texttt{src/network/server.py}, recording server ID, block ID, fragment index, and the specific check that failed. This structured logging enables operators to correlate failures over time and attribute Byzantine behavior by analyzing aggregated logs for patterns of repeated failures from specific server instances.
+\item \textbf{Owner}: Albert
+\item \textbf{Testing}: Inject corrupted fragments during PUT operations and verify that WARNING level log entries appear with full context. Test multiple corrupted requests and verify that log analysis can identify patterns of failures from a specific server.
 \end{itemize}
 
 \subsection{Information Disclosure Threat Resolutions}
 
 \subsubsection{I.1: Fragment Eavesdropping}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Dependency responsibility
+\item \textbf{Resolution}: Transport layer confidentiality is outside the scope of veri-store's erasure coding and integrity verification design. In production deployments, operators must terminate TLS at the edge (reverse proxy, load balancer, or API gateway) to provide transport encryption. The erasure coding scheme provides no inherent confidentiality; applications requiring confidentiality must encrypt data at the application layer before erasure encoding or rely on TLS for transport security.
+\item \textbf{Owner}: Albert (deployment/documentation)
+\item \textbf{Testing}: Verify that production deployments use HTTPS endpoints. Network traffic capture tools should confirm that fragment payloads are encrypted in transit. For the academic prototype, document the assumption that HTTP is acceptable in controlled laboratory networks.
 \end{itemize}
 
 \subsubsection{I.2: Storage Server Data Access}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Accepted risk with operational controls
+\item \textbf{Resolution}: Storage servers have direct filesystem access to fragment data at rest in the data/server\_N directories. A single compromised server can read its local fragments but cannot reconstruct complete objects without collecting at least m fragments from other servers. In production, operators should use standard operating system access controls to restrict filesystem access to the server process user account. For stronger confidentiality, applications can encrypt data before submitting it to veri-store, treating the storage system as untrusted infrastructure.
+\item \textbf{Owner}: Albert
+\item \textbf{Testing}: Review filesystem permissions on fragment storage directories. Verify that only the server process owner can read fragment files. For encrypted deployments, verify that stored fragments contain ciphertext rather than plaintext by examining on-disk data.
 \end{itemize}
 
 \subsubsection{I.3: Fingerprint Analysis}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Partially mitigated by cryptographic hash collision resistance
+\item \textbf{Resolution}: The fingerprinted cross-checksum includes SHA-256 hashes of all fragments and homomorphic fingerprints for the first m fragments. While these values do not directly expose plaintext content, they enable offline correlation attacks where an attacker can identify duplicate uploads by matching hash sets. The SHA-256 hash function provides preimage resistance, making dictionary attacks computationally expensive but not impossible for low-entropy data. Production systems requiring stronger privacy guarantees should encrypt objects before dispersal or add randomness to block identifiers to decorrelate metadata across uploads.
+\item \textbf{Owner}: Albert
+\item \textbf{Testing}: Store the same object multiple times and verify that fpcc values are deterministic. Attempt to correlate uploads by comparing stored fpcc\_json values. For systems requiring privacy, verify that client-side encryption is applied before erasure encoding.
 \end{itemize}
 
 \subsubsection{I.4: Error Message Information Leakage}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: Already mitigated by structured error responses and controlled logging
+\item \textbf{Resolution}: HTTP error responses return minimal context to clients via FastAPI's HTTPException mechanism in \texttt{src/network/server.py}, including only block ID, fragment index, and generic status descriptions without disclosing internal server topology or storage paths. Detailed diagnostic information such as verification failure details, stack traces, and internal state is written to server-side logs rather than returned to clients. The logging implementation records comprehensive context for operator debugging while preventing information disclosure to potentially hostile clients.
+\item \textbf{Owner}: Albert
+\item \textbf{Testing}: Trigger error conditions (404 not found, 409 conflict, 422 validation failure) and verify that HTTP responses contain only generic error messages without internal details. Verify that detailed diagnostic information appears in server logs but not in client responses. Test that stack traces and filesystem paths are not leaked in production error responses.
 \end{itemize}
 
 \subsection{Denial of Service Threat Resolutions}

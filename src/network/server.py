@@ -13,11 +13,6 @@ On receipt of a PUT, the server immediately verifies the fragment against the
 supplied fpcc.  If verification fails, the server still stores the fragment
 (so the client can request it for debugging) but marks it INVALID and returns
 HTTP 422.
-
-Run a single server:
-    uvicorn src.network.server:app --port 5001
-    # or with the CLI wrapper:
-    python -m veri-store.server --id 1 --port 5001
 """
 
 from __future__ import annotations
@@ -25,9 +20,10 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import time
 from pathlib import Path as _Path
 
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import FastAPI, HTTPException, Path, Request
 
 from ..storage.fragment import FragmentRecord, VerificationStatus
 from ..storage.metadata import ObjectMetadata
@@ -78,6 +74,27 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
     # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
     fpcc_cache: dict[tuple[str, int], str] = {}
 
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        """Log all HTTP Requests, with their codes and timing"""
+
+        start_time = time.time()
+        response = await call_next(request)
+        end_time = time.time()
+
+        time_elapsed_ms = (end_time - start_time) * 1000
+
+        _log.info(
+            "[server %d] %s %s → %d (%.0fms)",
+            server_id,
+            request.method,
+            request.url.path,
+            response.status_code,
+            time_elapsed_ms,
+        )
+
+        return response
+
     # ------------------------------------------------------------------
     # Route handlers
     # Each is a thin closure that delegates to the standalone helpers below,
@@ -95,8 +112,28 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
         # (design intent), so the cache entry must exist for GET to work.
 
         # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
+
+        fragment_size = len(body.fragment_data)
+        _log.info(
+            "[server %d] Storing fragment: block_id=%s, index=%d, size=%d bytes",
+            server_id,
+            block_id,
+            index,
+            fragment_size,
+        )
+
         fpcc_cache[(block_id, index)] = body.fpcc_json
-        return put_fragment(block_id, index, body, store, server_id, fpcc_cache)
+        response = put_fragment(block_id, index, body, store, server_id, fpcc_cache)
+
+        _log.info(
+            "[server %d] Stored fragment: block_id=%s, index=%d, status=%s",
+            server_id,
+            block_id,
+            index,
+            response.verification_status,
+        )
+
+        return response
 
     @app.get("/fragments/{block_id}/{index}")
     def _get(
@@ -127,7 +164,14 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
 
     @app.get("/health")
     def _health() -> HealthResponse:
-        return get_health(store, server_id)
+        response = get_health(store, server_id)
+        _log.debug(
+            "[server %d] Health check: status=%s, fragments=%d",
+            server_id,
+            response.status,
+            response.fragment_count,
+        )
+        return response
 
     return app
 
@@ -194,6 +238,12 @@ def put_fragment(
         data_matches = incoming_hash == stored_hash
 
         if metadata_matches and fpcc_matches and data_matches:
+            _log.info(
+                "[server %d] Idempotent PUT detected: block_id=%s, index=%d, returning existing fragment",
+                server_id,
+                block_id,
+                index,
+            )
             return StoreFragmentResponse(
                 block_id=block_id,
                 index=index,
@@ -201,6 +251,16 @@ def put_fragment(
                 message=f"Fragment ({block_id}, {index}) already stored (idempotent).",
             )
         else:
+            _log.warning(
+                "[server %d] Fragment mismatch for PUT: block_id=%s, index=%d, "
+                "metadata_match=%s, fpcc_match=%s, data_match=%s",
+                server_id,
+                block_id,
+                index,
+                metadata_matches,
+                fpcc_matches,
+                data_matches,
+            )
             raise HTTPException(
                 status_code=409,
                 detail=(
