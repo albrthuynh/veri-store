@@ -50,12 +50,21 @@ _log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
+def create_app(
+    server_id: int,
+    data_dir: str = "./data",
+    byzantine_indices: frozenset[int] = frozenset(),
+) -> FastAPI:
     """Create and configure the FastAPI application for one server instance.
 
     Args:
-        server_id: This server's unique integer ID (1-based).
-        data_dir:  Root directory for fragment storage.
+        server_id:         This server's unique integer ID (1-based).
+        data_dir:          Root directory for fragment storage.
+        byzantine_indices: Fragment indices for which this server will return
+                           deliberately corrupted data on GET, simulating a
+                           Byzantine-faulty server.  All other behaviour
+                           (PUT, DELETE, health) is unaffected.  Defaults to
+                           the empty set (honest server).
 
     Returns:
         A configured FastAPI application instance.
@@ -146,9 +155,30 @@ def create_app(server_id: int, data_dir: str = "./data") -> FastAPI:
         # field overridden, leaving all other fields unchanged.
 
         # TODO: Update once FragmentRecord stores fpcc_json and the store is fully implemented.
-        return response.model_copy(
+        response = response.model_copy(
             update={"fpcc_json": fpcc_cache.get((block_id, index), "")}
         )
+
+        # Byzantine fault injection: if this index is in byzantine_indices,
+        # corrupt the fragment bytes before returning them.  Every byte is
+        # XOR-ed with 0xFF, guaranteeing a SHA-256 hash mismatch that the
+        # client's Verifier.check() call will catch and reject.
+        if index in byzantine_indices:
+            original_bytes = base64.b64decode(response.fragment_data)
+            corrupted_bytes = bytes(b ^ 0xFF for b in original_bytes)
+            _log.warning(
+                "[server %d] BYZANTINE fault injected for fragment (%s, %d): "
+                "returning %d corrupted bytes",
+                server_id,
+                block_id,
+                index,
+                len(corrupted_bytes),
+            )
+            response = response.model_copy(
+                update={"fragment_data": base64.b64encode(corrupted_bytes).decode()}
+            )
+
+        return response
 
     @app.delete("/fragments/{block_id}/{index}")
     def _delete(
@@ -469,7 +499,17 @@ def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
 #   uvicorn src.network.server:app --port 5001
 
 # Where (or when) are these environment variables set?
+# BYZANTINE_INDICES: comma-separated fragment indices this server should
+# corrupt on GET, e.g. "0,2".  Empty string (the default) means honest.
+_byzantine_env = os.environ.get("BYZANTINE_INDICES", "")
+_byzantine_indices: frozenset[int] = (
+    frozenset(int(i) for i in _byzantine_env.split(",") if i.strip())
+    if _byzantine_env.strip()
+    else frozenset()
+)
+
 app = create_app(
     server_id=int(os.environ.get("SERVER_ID", "1")),
     data_dir=os.environ.get("DATA_DIR", "./data"),
+    byzantine_indices=_byzantine_indices,
 )
