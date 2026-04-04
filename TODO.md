@@ -147,12 +147,12 @@
 
 #### Mac (Security/Software Engineering)
 
-- [ ] Implement Byzantine fault injection (server sends wrong fragment)
-- [ ] Test detection: client should reject inconsistent fragments
-- [ ] Measure false positive rate (valid fragments incorrectly rejected)
-- [ ] Document security guarantees achieved
-- [ ] **Security Model §10.1:** Write Spoofing threats (S.1, S.2, S.3)
-- [ ] **Security Model §10.2:** Write Tampering threats (T.1, T.2, T.3, T.4)
+- [X] Implement Byzantine fault injection (server sends wrong fragment)
+- [X] Test detection: client should reject inconsistent fragments
+- [X] Measure false positive rate (valid fragments incorrectly rejected)
+- [X] Document security guarantees achieved
+- [X] **Security Model §10.1:** Write Spoofing threats (S.1, S.2, S.3)
+- [X] **Security Model §10.2:** Write Tampering threats (T.1, T.2, T.3, T.4)
 
 #### Albert (Systems/Backend)
 
