@@ -273,3 +273,114 @@ class TestByzantineDetection:
             f"Expected all {trials} corruptions to be detected, "
             f"but only {detected} were caught."
         )
+
+
+# ---------------------------------------------------------------------------
+# False positive rate
+# ---------------------------------------------------------------------------
+
+
+class TestFalsePositiveRate:
+    """Measures the false positive rate of Verifier.check().
+
+    A false positive occurs when Verifier.check() returns a non-CONSISTENT
+    result for a fragment that IS valid — i.e., one genuinely produced by
+    the encoder and consistent with its fpcc.
+
+    Both verification checks (hash and fingerprint) are deterministic
+    functions of the fragment data and the fpcc.  For an authentic fragment,
+    SHA-256(d_i) always equals fpcc.hashes[i] and fp(r, d_i) always equals
+    fpcc.fingerprints[i], so the theoretical false positive rate is exactly
+    0%.  The tests below confirm this holds empirically across a range of
+    coding parameters, payload sizes, and fragment indices.
+    """
+
+    # (n, m) coding configurations to exercise
+    _CONFIGS = [(5, 3), (7, 4), (10, 6)]
+
+    # Representative payload sizes and byte patterns
+    _PAYLOADS = [
+        b"tiny",
+        b"A" * 64,
+        b"\x00" * 128,
+        b"\xff" * 128,
+        bytes(range(256)),
+        b"mixed: " + bytes(range(128)) * 3,
+    ]
+
+    def test_valid_fragments_never_rejected_across_configs(self):
+        """Verifier.check() returns CONSISTENT for every valid fragment across
+        a range of (n, m) coding parameters and payload sizes.
+
+        False positive count must be exactly 0.
+        """
+        false_positives = 0
+        total = 0
+
+        for n, m in self._CONFIGS:
+            for i, payload in enumerate(self._PAYLOADS):
+                data = f"fp-test-{n}-{m}-{i}:".encode() + payload
+                fragments = encode(data, n=n, m=m)
+                fpcc = FingerprintedCrossChecksum.generate(fragments)
+
+                for frag in fragments:
+                    report = Verifier.check(frag.index, frag.data, fpcc)
+                    if report.result != VerificationResult.CONSISTENT:
+                        false_positives += 1
+                    total += 1
+
+        assert false_positives == 0, (
+            f"False positive rate: {false_positives}/{total} valid fragments "
+            f"incorrectly rejected (expected 0/{total})."
+        )
+
+    def test_repeated_verification_is_deterministic(self):
+        """Re-verifying the same valid fragment always returns CONSISTENT.
+
+        The random element r in the fingerprint check is derived from the
+        fpcc hashes via a deterministic oracle (RandomOracle.derive), not
+        sampled fresh on each call.  If r were re-sampled, valid fragments
+        would fail with probability 1/256 per check — a spurious false
+        positive source.  Repeating each check 50 times confirms stability.
+        """
+        frags = encode(b"determinism test -- repeated verification", n=5, m=3)
+        fpcc = FingerprintedCrossChecksum.generate(frags)
+
+        repetitions = 50
+        for frag in frags:
+            for attempt in range(repetitions):
+                report = Verifier.check(frag.index, frag.data, fpcc)
+                assert report.result == VerificationResult.CONSISTENT, (
+                    f"Fragment {frag.index} failed on attempt {attempt + 1}/{repetitions}: "
+                    f"{report.result.value} — {report.detail}"
+                )
+
+    def test_false_positive_rate_empirically_zero(self):
+        """Measure the empirical false positive rate over 500 fragment checks.
+
+        Generates 100 distinct data blocks, encodes each into 5 fragments,
+        and verifies all 500 fragments.  The observed false positive rate
+        must be exactly 0.0% — consistent with the theoretical guarantee
+        that deterministic checks on matching data never fail.
+        """
+        false_positives = 0
+        total = 0
+
+        for i in range(100):
+            data = f"empirical-fp-rate-block-{i:04d}:".encode() + b"X" * 64
+            fragments = encode(data, n=5, m=3)
+            fpcc = FingerprintedCrossChecksum.generate(fragments)
+
+            for frag in fragments:
+                report = Verifier.check(frag.index, frag.data, fpcc)
+                if report.result != VerificationResult.CONSISTENT:
+                    false_positives += 1
+                total += 1
+
+        rate = false_positives / total
+        assert false_positives == 0, (
+            f"Empirical false positive rate: {false_positives}/{total} = {rate:.4%}. "
+            f"Expected: 0/{total} = 0.0000%.\n"
+            f"A non-zero rate indicates a bug in the verification pipeline — "
+            f"Verifier.check() is rejecting fragments it should accept."
+        )
