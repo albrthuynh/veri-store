@@ -14,6 +14,7 @@ Covers:
 
 import pytest
 import base64
+import json
 from fastapi.testclient import TestClient
 from pathlib import Path
 
@@ -58,6 +59,82 @@ class TestPutFragment:
         """A PUT with tampered fragment bytes returns 422."""
         tampered = {**valid_store_body, "fragment_data": base64.b64encode(b"garbage").decode()}
         resp = client.put("/fragments/block1/0", json=tampered)
+        assert resp.status_code == 422
+
+    def test_put_missing_fragment_data_returns_422(self, client, valid_store_body):
+        """A PUT missing fragment_data is rejected by request validation."""
+        invalid_body = dict(valid_store_body)
+        invalid_body.pop("fragment_data")
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_extra_field_returns_422(self, client, valid_store_body):
+        """A PUT with unexpected fields is rejected when extra='forbid'."""
+        invalid_body = {**valid_store_body, "unexpected_field": "should not be allowed"}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_threshold_greater_than_total_returns_422(self, client, valid_store_body):
+        """A PUT with threshold_m > total_n is rejected by model validation."""
+        invalid_body = {**valid_store_body, "total_n": 3, "threshold_m": 4}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_empty_fragment_data_returns_422(self, client, valid_store_body):
+        """A PUT with empty fragment_data is rejected by model validation."""
+        invalid_body = {**valid_store_body, "fragment_data": ""}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_whitespace_fpcc_json_returns_422(self, client, valid_store_body):
+        """A PUT with blank fpcc_json is rejected after whitespace stripping."""
+        invalid_body = {**valid_store_body, "fpcc_json": "   "}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_invalid_base64_returns_422(self, client, valid_store_body):
+        """A PUT with malformed base64 is rejected by request validation."""
+        invalid_body = {**valid_store_body, "fragment_data": "not-valid-base64!!!"}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_empty_decoded_fragment_returns_422(self, client, valid_store_body):
+        """A PUT whose fragment_data decodes to zero bytes is rejected."""
+        invalid_body = {**valid_store_body, "fragment_data": base64.b64encode(b"").decode()}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_invalid_fpcc_json_shape_returns_422(self, client, valid_store_body):
+        """A PUT with malformed fpcc_json is rejected by request validation."""
+        invalid_body = {
+            **valid_store_body,
+            "fpcc_json": json.dumps({"hashes": [], "r": 5}),
+        }
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
+        assert resp.status_code == 422
+
+    def test_put_invalid_fpcc_json_syntax_returns_422(self, client, valid_store_body):
+        """A PUT with non-JSON fpcc_json is rejected by request validation."""
+        invalid_body = {**valid_store_body, "fpcc_json": "{not valid json}"}
+
+        resp = client.put("/fragments/block1/0", json=invalid_body)
+
         assert resp.status_code == 422
 
     def test_put_idempotent_returns_200(self, client, valid_store_body):

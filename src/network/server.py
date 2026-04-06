@@ -489,9 +489,26 @@ _byzantine_indices: frozenset[int] = (
     else frozenset()
 )
 
-app = create_app(
-    server_id=int(os.environ.get("SERVER_ID", "1")),
-    data_dir=os.environ.get("DATA_DIR", "./data"),
-    byzantine_indices=_byzantine_indices,
-    token=os.environ.get("VERI_STORE_TOKEN", ""),
+_default_token = os.environ.get("VERI_STORE_TOKEN")
+app = (
+    create_app(
+        server_id=int(os.environ.get("SERVER_ID", "1")),
+        data_dir=os.environ.get("DATA_DIR", "./data"),
+        byzantine_indices=_byzantine_indices,
+        token=_default_token,
+    ) if _default_token else None
 )
+
+# def _create_default_app() -> FastAPI:
+#     token = os.environ.get("VERI_STORE_TOKEN", "")
+#     if not token:
+#         raise RuntimeError("VERI_STORE_TOKEN environment variable must be set to start the server")
+    
+#     return create_app(
+#         server_id=int(os.environ.get("SERVER_ID", "1")),
+#         data_dir=os.environ.get("DATA_DIR", "./data"),
+#         byzantine_indices=_byzantine_indices,
+#         token=token,
+#     )
+
+# app = _create_default_app()
