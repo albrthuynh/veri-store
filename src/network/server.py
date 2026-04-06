@@ -25,6 +25,7 @@ from pathlib import Path as _Path
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pytest_asyncio.plugin import scope
 
 from ..storage.fragment import FragmentRecord, VerificationStatus
 from ..storage.metadata import ObjectMetadata
@@ -72,13 +73,13 @@ def create_app(
     Returns:
         A configured FastAPI application instance.
     """
+    if not token:
+        raise ValueError("API token must be provided for authentication")
+
     app = FastAPI(title=f"veri-store server {server_id}")
     store = FragmentStore(f"{data_dir}/server_{server_id}")
 
-    if not token:
-        raise ValueError("API token must be provided for authentication")
     _api_token = token
-
     _bearer = HTTPBearer()
 
     def verify_token(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> None:
@@ -489,26 +490,31 @@ _byzantine_indices: frozenset[int] = (
     else frozenset()
 )
 
-_default_token = os.environ.get("VERI_STORE_TOKEN")
-app = (
-    create_app(
+def _create_default_fastapi_app() -> FastAPI:
+    """Create the default FastAPI app using environment variables for configuration."""
+    token = os.environ.get("VERI_STORE_TOKEN", "")
+    if not token:
+        raise ValueError("API token must be provided for authentication")
+    
+    return create_app(
         server_id=int(os.environ.get("SERVER_ID", "1")),
         data_dir=os.environ.get("DATA_DIR", "./data"),
         byzantine_indices=_byzantine_indices,
-        token=_default_token,
-    ) if _default_token else None
-)
+        token=token,
+    )
 
-# def _create_default_app() -> FastAPI:
-#     token = os.environ.get("VERI_STORE_TOKEN", "")
-#     if not token:
-#         raise RuntimeError("VERI_STORE_TOKEN environment variable must be set to start the server")
+class LazyServerApp:
+    """ASGI application that lazily initializes the FastAPI app on first request."""
+    def __init__(self) -> None:
+        self._fastapi_app: FastAPI | None = None
     
-#     return create_app(
-#         server_id=int(os.environ.get("SERVER_ID", "1")),
-#         data_dir=os.environ.get("DATA_DIR", "./data"),
-#         byzantine_indices=_byzantine_indices,
-#         token=token,
-#     )
+    def _get_app(self) -> FastAPI:
+        if self._fastapi_app is None:
+            self._fastapi_app = _create_default_fastapi_app()
+        return self._fastapi_app
+    
+    async def __call__(self, scope, receive, send) -> None:
+        fastapi_app = self._get_app()
+        await fastapi_app(scope, receive, send)
 
-# app = _create_default_app()
+app = LazyServerApp()

@@ -1,7 +1,7 @@
 """
 test_store.py -- Unit tests for the disk-backed FragmentStore.
 
-Uses pytest's tmp_path fixture to avoid polluting the real filesystem.
+Uses a repo-local temporary directory to avoid polluting the real filesystem.
 
 Covers:
     - put() then get() returns the same FragmentRecord
@@ -12,17 +12,25 @@ Covers:
     - put() is atomic (temp-file-then-rename pattern)
 """
 
+from collections.abc import Iterator
 import pytest
+import shutil
+import uuid
 from pathlib import Path
 from src.storage.store import FragmentStore, FragmentNotFoundError
 from src.storage.fragment import FragmentRecord
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> FragmentStore:
+def store() -> Iterator[FragmentStore]:
     """Provide a fresh FragmentStore in a temporary directory."""
-    # TODO: return FragmentStore(tmp_path / "fragments")
-    ...
+    test_root = Path("data/test_runs") / str(uuid.uuid4())
+    test_root.mkdir(parents=True, exist_ok=False)
+
+    try:
+        yield FragmentStore(test_root / "fragments")
+    finally:
+        shutil.rmtree(test_root, ignore_errors=True)
 
 
 class TestFragmentStoreCRUD:

@@ -15,6 +15,8 @@ Covers:
 import pytest
 import base64
 import json
+import shutil
+import uuid
 from fastapi.testclient import TestClient
 from pathlib import Path
 
@@ -26,11 +28,18 @@ _TOKEN = "test-token"
 
 
 @pytest.fixture
-def client(tmp_path: Path):
+def client():
     """Provide a TestClient backed by a fresh server with temp storage."""
-    app = create_app(server_id=1, data_dir=str(tmp_path), token=_TOKEN)
-    return TestClient(app, headers={"Authorization": f"Bearer {_TOKEN}"})
+    test_root = Path("data/test_runs") / str(uuid.uuid4())
+    test_root.mkdir(parents=True, exist_ok=False)
 
+    app = create_app(server_id=1, data_dir=str(test_root), token=_TOKEN)
+    client = TestClient(app, headers={"Authorization": f"Bearer {_TOKEN}"})
+
+    try:
+        yield client
+    finally:
+        shutil.rmtree(test_root, ignore_errors=True)
 
 @pytest.fixture
 def valid_store_body():
@@ -45,6 +54,10 @@ def valid_store_body():
         "fpcc_json": fpcc.to_json(),
     }
 
+def test_create_app_without_token_raises():
+    """Creating the app with an empty API token should raise an error."""
+    with pytest.raises(ValueError, match="API token must be provided for authentication"):
+        create_app(server_id=1, data_dir="/tmp", token="")
 
 class TestPutFragment:
     """Tests for PUT /fragments/{block_id}/{index}."""
