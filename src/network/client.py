@@ -72,6 +72,7 @@ class VeriStoreClient:
         servers (list[ServerAddress]): Addresses of all n storage servers.
         m (int): Reconstruction threshold (minimum fragments needed).
         timeout (float): HTTP request timeout in seconds.
+        token (str): API token for authentication with servers.
     """
 
     def __init__(
@@ -79,6 +80,7 @@ class VeriStoreClient:
         servers: list[ServerAddress],
         m: int = 3,
         timeout: float = 5.0,
+        token: str = "",
     ) -> None:
         """Initialise the client.
 
@@ -86,6 +88,7 @@ class VeriStoreClient:
             servers: List of server addresses (length == n).
             m:       Reconstruction threshold (default 3).
             timeout: Per-request HTTP timeout in seconds (default 5.0).
+            token:   API token for authentication.
         """
         if m <= 0:
             raise ValueError("m must be >= 1")
@@ -97,6 +100,7 @@ class VeriStoreClient:
         self.servers = servers
         self.m = m
         self.timeout = timeout
+        self.token = token
 
     def _request_with_retry(
         self,
@@ -106,12 +110,13 @@ class VeriStoreClient:
         json: dict | None = None,
     ) -> httpx.Response | None:
         """Helper method to send an HTTP request with retry logic for transient failures."""
+        headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         delay = _BACKOFF
 
         for attempt in range(_MAX_ATTEMPTS):
             try:
                 with httpx.Client(timeout=self.timeout) as http:
-                    response = http.request(method, url, json=json)
+                    response = http.request(method, url, json=json, headers=headers)
                 
                 if response.status_code < 500:
                     return response
@@ -149,15 +154,7 @@ class VeriStoreClient:
                 original_length=fragment.original_length,
                 fpcc_json=fpcc_json,
             )
-            # try:
-            #     with httpx.Client(timeout=self.timeout) as http:
-            #         response = http.put(
-            #             self._server_url(server, fragment.block_id, fragment.index),
-            #             json=request_body.model_dump(),
-            #         )
-            #         return response.status_code == 200
-            # except httpx.RequestError:
-            #     return False
+
             response = self._request_with_retry(
                 "PUT",
                 self._server_url(server, fragment.block_id, fragment.index),
@@ -199,16 +196,7 @@ class VeriStoreClient:
                             verified.
         """
 
-        def _get_one(server: ServerAddress, index: int) -> GetFragmentResponse | None:
-            # try:
-            #     with httpx.Client(timeout=self.timeout) as http:
-            #         response = http.get(self._server_url(server, block_id, index))
-            #     if response.status_code != 200:
-            #         return None
-            #     return GetFragmentResponse.model_validate(response.json())
-            # except (httpx.RequestError, ValidationError, ValueError):
-            #     return None
-            
+        def _get_one(server: ServerAddress, index: int) -> GetFragmentResponse | None:            
             response = self._request_with_retry(
                 "GET",
                 self._server_url(server, block_id, index),
@@ -309,24 +297,6 @@ class VeriStoreClient:
             block_id: The key of the block to delete.
         """
         def _delete_one(server: ServerAddress, index: int) -> None:
-            # try:
-            #     with httpx.Client(timeout=self.timeout) as http:
-            #         response = http.delete(self._server_url(server, block_id, index))
-            #     if response.status_code in (200, 404):
-            #         return
-            #     _log.warning(
-            #         "DELETE unexpected status from server %s (%s): %s",
-            #         server.server_id,
-            #         self._server_url(server, block_id, index),
-            #         response.status_code,
-            #     )
-            # except httpx.RequestError as exc:
-            #     _log.warning(
-            #         "DELETE request error for server %s (%s): %s",
-            #         server.server_id,
-            #         self._server_url(server, block_id, index),
-            #         exc,
-            #     )
             response = self._request_with_retry(
                 "DELETE",
                 self._server_url(server, block_id, index)
@@ -365,12 +335,6 @@ class VeriStoreClient:
             A dict mapping server_id -> True (healthy) / False (unreachable).
         """
         def _health_one(server: ServerAddress) -> tuple[int, bool]:
-            # try:
-            #     with httpx.Client(timeout=self.timeout) as http:
-            #         response = http.get(f"{server.base_url}/health")
-            #     return server.server_id, response.status_code == 200
-            # except httpx.RequestError:
-            #     return server.server_id, False
             response = self._request_with_retry(
                 "GET",
                 f"{server.base_url}/health",

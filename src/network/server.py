@@ -23,7 +23,8 @@ import os
 import time
 from pathlib import Path as _Path
 
-from fastapi import FastAPI, HTTPException, Path, Request
+from fastapi import Depends, FastAPI, HTTPException, Path, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ..storage.fragment import FragmentRecord, VerificationStatus
 from ..storage.metadata import ObjectMetadata
@@ -54,6 +55,7 @@ def create_app(
     server_id: int,
     data_dir: str = "./data",
     byzantine_indices: frozenset[int] = frozenset(),
+    token: str = "",
 ) -> FastAPI:
     """Create and configure the FastAPI application for one server instance.
 
@@ -65,6 +67,7 @@ def create_app(
                            Byzantine-faulty server.  All other behaviour
                            (PUT, DELETE, health) is unaffected.  Defaults to
                            the empty set (honest server).
+        token:             API token for authentication with clients.
 
     Returns:
         A configured FastAPI application instance.
@@ -72,16 +75,15 @@ def create_app(
     app = FastAPI(title=f"veri-store server {server_id}")
     store = FragmentStore(f"{data_dir}/server_{server_id}")
 
-    # In-memory fpcc_json cache keyed by (block_id, index).
-    # Populated unconditionally on PUT (including INVALID fragments) so that
-    # a subsequent GET can return the fpcc alongside the fragment bytes.
-    # This bridges a data-model gap: FragmentRecord currently stores only
-    # fpcc_digest, not the full JSON.  Once FragmentRecord.to_dict() and
-    # from_dict() are implemented to persist fpcc_json on disk, this cache
-    # can be removed and get_fragment() can source fpcc_json from the record.
+    if not token:
+        raise ValueError("API token must be provided for authentication")
+    _api_token = token
 
-    # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
-    fpcc_cache: dict[tuple[str, int], str] = {}
+    _bearer = HTTPBearer()
+
+    def verify_token(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> None:
+        if credentials.credentials != _api_token:
+            raise HTTPException(status_code=401, detail="Invalid or missing token")
 
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
@@ -107,7 +109,7 @@ def create_app(
     # ------------------------------------------------------------------
     # Route handlers
     # Each is a thin closure that delegates to the standalone helpers below,
-    # binding the per-instance store, server_id, and fpcc_cache.
+    # binding the per-instance store and server_id.
     # ------------------------------------------------------------------
 
     @app.put("/fragments/{block_id}/{index}")
@@ -115,12 +117,8 @@ def create_app(
         body: StoreFragmentRequest,
         block_id: str = Path(min_length=1, description="Block identifier"),
         index: int = Path(ge=0, description="Fragment index (0-based)"),
+        _: None = Depends(verify_token),
     ) -> StoreFragmentResponse:
-        # Cache fpcc_json before calling put_fragment.  Even if verification
-        # fails and put_fragment raises HTTP 422, the fragment is still stored
-        # (design intent), so the cache entry must exist for GET to work.
-
-        # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
 
         fragment_size = len(body.fragment_data)
         _log.info(
@@ -131,8 +129,7 @@ def create_app(
             fragment_size,
         )
 
-        fpcc_cache[(block_id, index)] = body.fpcc_json
-        response = put_fragment(block_id, index, body, store, server_id, fpcc_cache)
+        response = put_fragment(block_id, index, body, store, server_id)
 
         _log.info(
             "[server %d] Stored fragment: block_id=%s, index=%d, status=%s",
@@ -148,16 +145,9 @@ def create_app(
     def _get(
         block_id: str = Path(min_length=1, description="Block identifier"),
         index: int = Path(ge=0, description="Fragment index (0-based)"),
+        _: None = Depends(verify_token),
     ) -> GetFragmentResponse:
         response = get_fragment(block_id, index, store)
-        # Inject the fpcc_json that was stashed at PUT time.
-        # model_copy() (Pydantic v2) returns a new model with only the named
-        # field overridden, leaving all other fields unchanged.
-
-        # TODO: Update once FragmentRecord stores fpcc_json and the store is fully implemented.
-        response = response.model_copy(
-            update={"fpcc_json": fpcc_cache.get((block_id, index), "")}
-        )
 
         # Byzantine fault injection: if this index is in byzantine_indices,
         # corrupt the fragment bytes before returning them.  Every byte is
@@ -184,12 +174,9 @@ def create_app(
     def _delete(
         block_id: str = Path(min_length=1, description="Block identifier"),
         index: int = Path(ge=0, description="Fragment index (0-based)"),
+        _: None = Depends(verify_token),
     ) -> DeleteFragmentResponse:
-        # Evict the cached fpcc_json when a fragment is deleted so the cache
-        # does not grow without bound during long-running server sessions.
 
-        # TODO: Remove once FragmentRecord stores fpcc_json and the store is fully implemented.
-        fpcc_cache.pop((block_id, index), None)
         return delete_fragment(block_id, index, store)
 
     @app.get("/health")
@@ -217,7 +204,6 @@ def put_fragment(
     body: StoreFragmentRequest,
     store: FragmentStore,
     server_id: int,
-    fpcc_cache: dict[tuple[str, int], str],
 ) -> StoreFragmentResponse:
     """Handle PUT /fragments/{block_id}/{index}.
 
@@ -230,7 +216,6 @@ def put_fragment(
         body:     Validated request body.
         store:    The server's fragment store.
         server_id: This server's ID (for logging).
-        fpcc_cache: In-memory cache mapping (block_id, index) to fpcc_json strings, used for idempotency checks when fragments already exist.
 
     Returns:
         StoreFragmentResponse with the verification result.
@@ -244,7 +229,6 @@ def put_fragment(
     # For idempotency, if a fragment has the same content -> 200 OK, if not -> 409 Conflict
     if store.has(block_id, index):
         stored = store.get(block_id, index)
-        cache_stored_fpcc = fpcc_cache.get((block_id, index))
 
         # Check if all the data is the same
         # Because if someone sends the same fragment data but with different erasure coding parameters, it's a completely different logical fragment
@@ -253,7 +237,7 @@ def put_fragment(
             and stored.threshold_m == body.threshold_m
             and stored.original_length == body.original_length
         )
-        fpcc_matches = cache_stored_fpcc == body.fpcc_json
+        fpcc_matches = stored.fpcc_json == body.fpcc_json
 
         try:
             incoming_bytes = base64.b64decode(body.fragment_data)
@@ -366,6 +350,7 @@ def put_fragment(
         original_length=body.original_length,
         verification_status=status,
         fpcc_digest=fpcc.digest(),
+        fpcc_json=body.fpcc_json,
     )
     store.put(record)
 
@@ -413,10 +398,6 @@ def get_fragment(
     # Base64-encode the raw bytes for JSON transport (matching the PUT format).
     fragment_data_b64 = base64.b64encode(record.data).decode()
 
-    # fpcc_json is left empty here; the route handler in create_app._get
-    # injects the cached value via model_copy() before sending the response.
-    # This separation keeps get_fragment() testable in isolation without a
-    # live fpcc_cache.
     return GetFragmentResponse(
         block_id=record.block_id,
         index=record.index,
@@ -424,7 +405,7 @@ def get_fragment(
         total_n=record.total_n,
         threshold_m=record.threshold_m,
         original_length=record.original_length,
-        fpcc_json="",
+        fpcc_json=record.fpcc_json or "",  # Should always be present, but default to empty string if not.
         verification_status=record.verification_status.value,
     )
 
@@ -512,4 +493,5 @@ app = create_app(
     server_id=int(os.environ.get("SERVER_ID", "1")),
     data_dir=os.environ.get("DATA_DIR", "./data"),
     byzantine_indices=_byzantine_indices,
+    token=os.environ.get("VERI_STORE_TOKEN", ""),
 )

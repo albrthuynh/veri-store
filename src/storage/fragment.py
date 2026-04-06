@@ -41,6 +41,7 @@ class FragmentRecord:
         verification_status (VerificationStatus): Result of the last fpcc check.
         fpcc_digest (str | None): Hex digest of the fpcc this fragment was
                                    stored with, for re-verification on demand.
+        fpcc_json (str | None): The full fpcc JSON string, stored for debugging
     """
 
     index: int
@@ -52,6 +53,7 @@ class FragmentRecord:
     received_at: datetime = field(default_factory=datetime.utcnow)
     verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
     fpcc_digest: str | None = None
+    fpcc_json: str | None = None
 
     def to_dict(self) -> dict:
         """ Serialize the fragment record to a JSON-compatible dictionary. """
@@ -65,6 +67,7 @@ class FragmentRecord:
             "received_at": self.received_at.isoformat(),
             "verification_status": self.verification_status.value,
             "fpcc_digest": self.fpcc_digest,
+            "fpcc_json": self.fpcc_json,
         }
 
     @classmethod
@@ -78,6 +81,11 @@ class FragmentRecord:
         if fpcc_digest is not None and not isinstance(fpcc_digest, str):
             raise ValueError("fpcc_digest must be a string or None")
 
+        fpcc_json = d.get("fpcc_json")
+        if fpcc_json is not None and not isinstance(fpcc_json, str):
+            raise ValueError("fpcc_json must be a string or None")
+
+
         return cls(
             index=int(d["index"]),
             data=data,
@@ -88,4 +96,5 @@ class FragmentRecord:
             received_at=received_at,
             verification_status=verification_status,
             fpcc_digest=fpcc_digest,
+            fpcc_json=fpcc_json,
         )
