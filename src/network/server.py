@@ -25,6 +25,7 @@ from pathlib import Path as _Path
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.responses import JSONResponse
 
 from ..storage.fragment import FragmentRecord, VerificationStatus
 from ..storage.metadata import ObjectMetadata
@@ -39,6 +40,7 @@ from .protocol import (
     StoreFragmentResponse,
 )
 from ..verification.oracle import RandomOracle
+from .rate_limit import SlidingWindowRateLimiter
 
 # Module-level logger.  Each log message embeds server_id in the format
 # string so log lines from multiple server processes can be distinguished
@@ -56,6 +58,8 @@ def create_app(
     data_dir: str = "./data",
     byzantine_indices: frozenset[int] = frozenset(),
     token: str = "",
+    rate_limit_max_requests: int = 60,
+    rate_limit_window_seconds: float = 60.0,
 ) -> FastAPI:
     """Create and configure the FastAPI application for one server instance.
 
@@ -68,6 +72,8 @@ def create_app(
                            (PUT, DELETE, health) is unaffected.  Defaults to
                            the empty set (honest server).
         token:             API token for authentication with clients.
+        rate_limit_max_requests: Maximum number of allowed requests per client within the rate limit window.
+        rate_limit_window_seconds: Length of the rate limit window in seconds.
 
     Returns:
         A configured FastAPI application instance.
@@ -77,6 +83,11 @@ def create_app(
 
     app = FastAPI(title=f"veri-store server {server_id}")
     store = FragmentStore(f"{data_dir}/server_{server_id}")
+    
+    rate_limiter = SlidingWindowRateLimiter(
+        max_requests=rate_limit_max_requests,
+        window_seconds=rate_limit_window_seconds
+    )
 
     _api_token = token
     _bearer = HTTPBearer()
@@ -107,6 +118,50 @@ def create_app(
             time_elapsed_ms,
         )
 
+        return response
+    
+    def get_client_key(request: Request) -> str:
+        auth_header = request.headers.get("Authorization", "").strip()
+
+        if auth_header.startswith("Bearer "):
+            token_value = auth_header.removeprefix("Bearer ").strip()
+
+            if token_value:
+                return f"token:{token_value}"
+            
+        client_host = request.client.host if request.client is not None else "unknown"
+        return f"ip:{client_host}"
+    
+    @app.middleware("http")
+    async def enforce_rate_limit(request: Request, call_next):
+        # Keep /health exempt so liveness/readiness probes can't be throttled.
+        if request.url.path == "/health":
+            return await call_next(request)
+        
+        client_key = get_client_key(request)
+        decision = rate_limiter.check(client_key)
+
+        if not decision.allowed:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded. Please retry later."},
+                headers={
+                    "Retry-After": str(decision.retry_after_seconds or 1),
+                    "X-RateLimit-Limit": str(rate_limiter.max_requests),
+                    "X-RateLimit-Remaining": "0",
+                },
+            )
+
+        
+        response = await call_next(request)
+
+        # These headers are optional but useful to clients.
+        response.headers["X-RateLimit-Limit"] = str(rate_limiter.max_requests)
+        response.headers["X-RateLimit-Remaining"] = str(decision.remaining)
+
+        if decision.retry_after_seconds is not None:
+            response.headers["Retry-After"] = str(decision.retry_after_seconds)
+        
         return response
 
     # ------------------------------------------------------------------
