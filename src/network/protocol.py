@@ -72,7 +72,7 @@ class StoreFragmentRequest(BaseModel):
         try: 
             FingerprintedCrossChecksum.from_json(self.fpcc_json)
         except Exception as e:
-            raise ValueError(f"fpcc_json is not valid of valid shape: {e}") from e
+            raise ValueError(f"fpcc_json is not of valid shape: {e}") from e
         
         return self
 

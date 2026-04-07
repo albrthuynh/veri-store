@@ -178,8 +178,8 @@
 
 #### Mac (Security/Software Engineering)
 
-- [ ] Implement authentication/authorization (optional: simple token-based)
-- [ ] Add request validation (check payload structure)
+- [X] Implement authentication/authorization (optional: simple token-based)
+- [X] Add request validation (check payload structure)
 - [ ] Implement rate limiting per client
 - [ ] Add security headers to HTTP responses
 - [ ] **Security Model §11.1:** Write Spoofing threat resolutions (S.1, S.2, S.3)

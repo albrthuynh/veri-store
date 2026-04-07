@@ -6,12 +6,26 @@ Base URL: `http://localhost:{port}`
 
 ---
 
+## Authentication
+
+`PUT /fragments/{block_id}/{index}`, `GET /fragments/{block_id}/{index}`, and
+`DELETE /fragments/{block_id}/{index}` require a bearer token:
+```http
+Authorization: Bearer <token>
+```
+
+`GET /health` is publicly accessible and does not require authentication
+
+
 ## Endpoints
 
 ### `PUT /fragments/{block_id}/{index}`
 
-Store a single encoded fragment on this server.  The server immediately
-verifies the fragment against the supplied fpcc and persists it.
+Store a single encoded fragment on this server. The server first validates 
+the request structure, then verifies the fragment against the supplied fpcc, 
+and finally stores or rejects it accordingly.
+
+**Authentication required**: send a bearer token in the `Authorization` header.
 
 **Path parameters**
 
@@ -32,33 +46,71 @@ verifies the fragment against the supplied fpcc and persists it.
 }
 ```
 
+**Validation rules**
+- `fragment_data` must be a non-empty `base64` string
+- `total_n >= 1`
+- `threshold_m >= 1`
+- `threshold_m <= total_n`
+- `original_length >= 0`
+- `fpcc_json` must be non-empty and parse as valid `FingerprintedCrossChecksum`
+- Unexpected extra fields will be rejected
+
 **Response 200** — fragment stored successfully
 
 ```json
 {
   "block_id":            "abc123",
   "index":               0,
-  "verification_status": "consistent",
-  "message":             "Fragment stored."
+  "verification_status": "valid",
+  "message":             "Fragment index 0 is consistent with the fpcc."
 }
 ```
 
-**Response 422** — fpcc verification failed (fragment is inconsistent)
+**Response 422** - verification failure after a well-formed payload is accepted
 
 ```json
 {
-  "error":  "verification_failed",
-  "detail": "Fragment index 0 failed hash check."
+  "detail": "Hash mismatch for fragment index 0."
 }
 ```
 
-**Response 409** — fragment already exists for this (block_id, index)
+**Response 422** - invalid request payload
+
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body"],
+      "msg": "Value error, threshold_m 4 cannot be greater than total_n 3",
+      "input": {
+        "fragment_data": "Zm9v",
+        "total_n": 3,
+        "threshold_m": 4,
+        "original_length": 3,
+        "fpcc_json": "{\"hashes\": [], \"fingerprints\": [], \"r\": 5, \"n\": 3, \"m\": 4}"
+      }
+    }
+  ]
+}
+```
+
+**Response 409** — fragment already exists for this `(block_id, index)`
+
+```json
+{
+  "detail": "Fragment (block1, 0) already exists with different data"
+}
+
+```
 
 ---
 
 ### `GET /fragments/{block_id}/{index}`
 
 Retrieve a stored fragment.
+
+**Authentication required**: send a bearer token in the `Authorization` header.
 
 **Path parameters** — same as PUT.
 
@@ -85,6 +137,8 @@ Retrieve a stored fragment.
 
 Remove a stored fragment.
 
+**Authentication required**: send a bearer token in the `Authorization` header.
+
 **Response 200**
 
 ```json
@@ -103,6 +157,8 @@ Remove a stored fragment.
 
 Liveness and readiness probe.
 
+Authentication not required.
+
 **Response 200**
 
 ```json
@@ -117,12 +173,40 @@ Liveness and readiness probe.
 
 ## Error Format
 
-All 4xx and 5xx responses use this envelope:
+Error responses are not wrapped in a single custom envelope.
+
+Most application-level errors raised by the server use FastAPI's standard `HTTPException`
+shape:
 
 ```json
 {
-  "error":  "<machine-readable code>",
   "detail": "<human-readable explanation>"
+}
+```
+
+**Examples**
+```json
+{
+  "detail": "Invalid or missing token"
+}
+```
+
+```json
+{
+  "detail": "Fragment (block1, 0) already exists with different data"
+}
+```
+
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body"],
+      "msg": "<validation error message>",
+      "input": { "...": "..." }
+    }
+  ]
 }
 ```
 
