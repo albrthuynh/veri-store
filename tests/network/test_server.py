@@ -41,6 +41,28 @@ def client():
     finally:
         shutil.rmtree(test_root, ignore_errors=True)
 
+
+@pytest.fixture
+def limited_client():
+    """Provide a TestClient with a small rate limit for limiter tests."""
+    test_root = Path("data/test_runs") / str(uuid.uuid4())
+    test_root.mkdir(parents=True, exist_ok=False)
+
+    app = create_app(
+        server_id=1,
+        data_dir=str(test_root),
+        token=_TOKEN,
+        rate_limit_max_requests=2,
+        rate_limit_window_seconds=60.0,
+    )
+    client = TestClient(app, headers={"Authorization": f"Bearer {_TOKEN}"})
+
+    try:
+        yield client
+    finally:
+        shutil.rmtree(test_root, ignore_errors=True)
+
+
 @pytest.fixture
 def valid_store_body():
     """A minimal valid StoreFragmentRequest payload dict."""
@@ -230,3 +252,38 @@ class TestHealthEndpoint:
         """GET /health is publicly accessible without a token."""
         resp = client.get("/health", headers={"Authorization": ""})
         assert resp.status_code == 200
+
+
+class TestRateLimiting:
+    """Tests for per-client request rate limiting."""
+
+    def test_put_rate_limit_exceeded_returns_429(self, limited_client, valid_store_body):
+        """The third request within the active window is rejected with 429."""
+        resp1 = limited_client.put("/fragments/block1/0", json=valid_store_body)
+        resp2 = limited_client.put("/fragments/block1/0", json=valid_store_body)
+        resp3 = limited_client.put("/fragments/block1/0", json=valid_store_body)
+
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp3.status_code == 429
+
+    def test_rate_limited_response_includes_retry_after_header(
+        self, limited_client, valid_store_body
+    ):
+        """A rate-limited response should include Retry-After."""
+        limited_client.put("/fragments/block1/0", json=valid_store_body)
+        limited_client.put("/fragments/block1/0", json=valid_store_body)
+        resp = limited_client.put("/fragments/block1/0", json=valid_store_body)
+
+        assert resp.status_code == 429
+        assert "Retry-After" in resp.headers
+
+    def test_health_is_not_rate_limited(self, limited_client):
+        """Health checks remain available even after the client exceeds the limit."""
+        resp1 = limited_client.get("/health")
+        resp2 = limited_client.get("/health")
+        resp3 = limited_client.get("/health")
+
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp3.status_code == 200

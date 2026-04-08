@@ -14,6 +14,10 @@ Base URL: `http://localhost:{port}`
 Authorization: Bearer <token>
 ```
 
+Protected fragment endpoints are rate-limited per client. When the limit is
+exceeded, the server returns `429 Too Many Requests` and includes a
+`Retry-After` header indicating when the client may retry.
+
 `GET /health` is publicly accessible and does not require authentication
 
 
@@ -104,6 +108,13 @@ and finally stores or rejects it accordingly.
 
 ```
 
+**Response 429** - rate limit exceeded
+```json
+{
+  "detail": "Rate limit exceeded. Please retry later."
+}
+```
+
 ---
 
 ### `GET /fragments/{block_id}/{index}`
@@ -131,6 +142,13 @@ Retrieve a stored fragment.
 
 **Response 404** — fragment not found
 
+**Response 429** - rate limit exceeded
+```json
+{
+  "detail": "Rate limit exceeded. Please retry later."
+}
+```
+
 ---
 
 ### `DELETE /fragments/{block_id}/{index}`
@@ -150,6 +168,13 @@ Remove a stored fragment.
 ```
 
 **Response 404** — fragment not found
+
+**Response 429** - rate limit exceeded
+```json
+{
+  "detail": "Rate limit exceeded. Please retry later."
+}
+```
 
 ---
 
@@ -207,6 +232,12 @@ shape:
       "input": { "...": "..." }
     }
   ]
+}
+```
+
+```json
+{
+  "detail": "Rate limit exceeded. Please retry later."
 }
 ```
 

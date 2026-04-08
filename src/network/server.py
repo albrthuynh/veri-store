@@ -158,7 +158,6 @@ def create_app(
         # These headers are optional but useful to clients.
         response.headers["X-RateLimit-Limit"] = str(rate_limiter.max_requests)
         response.headers["X-RateLimit-Remaining"] = str(decision.remaining)
-
         if decision.retry_after_seconds is not None:
             response.headers["Retry-After"] = str(decision.retry_after_seconds)
         
