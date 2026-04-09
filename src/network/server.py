@@ -162,6 +162,22 @@ def create_app(
             response.headers["Retry-After"] = str(decision.retry_after_seconds)
         
         return response
+    
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        # Apply a consistent hardening policy to all HTTP responses in one place
+        # rather than duplicating header logic across individual route handlers.
+        response = await call_next(request)
+
+        # veri-store is an API, not a rendered website, so these headers disable
+        # browser content sniffing, framing, and client/proxy caching.
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+
+        return response
 
     # ------------------------------------------------------------------
     # Route handlers

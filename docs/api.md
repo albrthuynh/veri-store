@@ -20,6 +20,16 @@ exceeded, the server returns `429 Too Many Requests` and includes a
 
 `GET /health` is publicly accessible and does not require authentication
 
+## Security Headers
+
+All API responses include defensive HTTP headers intended for an API-only service:
+- `X-Content-Type-Options: nosniff`
+- `Cache-Control: nostore`
+- `Pragma: no-cache`
+- `X-Frame-Options: DENY`
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`
+
+These headers disable browser content sniffing, prevent framing, and instruct browsers or intermediaries to not cache API responses. They are appled to both successful and error responses.
 
 ## Endpoints
 

@@ -181,7 +181,7 @@
 - [X] Implement authentication/authorization (optional: simple token-based)
 - [X] Add request validation (check payload structure)
 - [X] Implement rate limiting per client
-- [ ] Add security headers to HTTP responses
+- [X] Add security headers to HTTP responses
 - [ ] **Security Model §11.1:** Write Spoofing threat resolutions (S.1, S.2, S.3)
 - [ ] **Security Model §11.2:** Write Tampering threat resolutions (T.1, T.2, T.3, T.4)
 

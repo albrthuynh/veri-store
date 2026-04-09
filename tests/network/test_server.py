@@ -287,3 +287,38 @@ class TestRateLimiting:
         assert resp1.status_code == 200
         assert resp2.status_code == 200
         assert resp3.status_code == 200
+
+
+class TestSecurityHeaders:
+    """Tests for security-related response headers."""
+
+    def _assert_security_headers(self, response) -> None:
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert response.headers["Pragma"] == "no-cache"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert (
+            response.headers["Content-Security-Policy"]
+            == "default-src 'none'; frame-ancestors 'none'"
+        )
+
+    def test_success_response_includes_security_headers(self, client, valid_store_body):
+        """A successful fragment PUT includes the configured security headers."""
+        resp = client.put("/fragments/block1/0", json=valid_store_body)
+
+        assert resp.status_code == 200
+        self._assert_security_headers(resp)
+
+    def test_health_response_includes_security_headers(self, client):
+        """The public health endpoint also includes security headers."""
+        resp = client.get("/health")
+
+        assert resp.status_code == 200
+        self._assert_security_headers(resp)
+
+    def test_error_response_includes_security_headers(self, client):
+        """Security headers are present on error responses as well."""
+        resp = client.get("/fragments/missing_block/0")
+
+        assert resp.status_code == 404
+        self._assert_security_headers(resp)
