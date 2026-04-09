@@ -17,6 +17,7 @@ import base64
 import json
 import shutil
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi.testclient import TestClient
 from pathlib import Path
 
@@ -287,6 +288,49 @@ class TestRateLimiting:
         assert resp1.status_code == 200
         assert resp2.status_code == 200
         assert resp3.status_code == 200
+
+
+class TestConcurrentAccess:
+    def test_concurrent_puts_to_same_fragment_are_idempotent(self, client, valid_store_body):
+        path = "/fragments/concurrent_block/0"
+        workers = 10
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = []
+            for _ in range(workers):
+                futures.append(pool.submit(client.put, path, json=valid_store_body))
+            responses = []
+            for future in as_completed(futures):
+                responses.append(future.result())
+
+        assert len(responses) == workers
+        for resp in responses:
+            assert resp.status_code == 200
+        assert client.get(path).status_code == 200
+
+    def test_concurrent_gets_from_same_fragment_return_consistent_data(
+        self, client, valid_store_body
+    ):
+        path = "/fragments/concurrent_block/0"
+        put_resp = client.put(path, json=valid_store_body)
+        assert put_resp.status_code == 200
+
+        workers = 10
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = []
+            for _ in range(workers):
+                futures.append(pool.submit(client.get, path))
+            responses = []
+            for future in as_completed(futures):
+                responses.append(future.result())
+
+        assert len(responses) == workers
+        payloads: list[str] = []
+        for resp in responses:
+            assert resp.status_code == 200
+            payloads.append(resp.json()["fragment_data"])
+        for payload in payloads:
+            assert payload == payloads[0]
 
 
 class TestSecurityHeaders:

@@ -11,6 +11,7 @@ Covers:
     - Integration: encode then decode round-trip for various data sizes
 """
 
+import os
 import pytest
 from itertools import combinations
 from src.erasure.encoder import encode
@@ -49,6 +50,16 @@ class TestDecodeRoundTrip:
     def test_large_data(self):
         """Round-trip works for 64 KB of random-ish data."""
         data = bytes(range(256)) * 256  # 64 KB
+        frags = encode(data, n=5, m=3)
+        assert decode(frags[:3]) == data
+
+    @pytest.mark.skipif(
+        os.getenv("RUN_LARGE_TESTS") != "1",
+        reason="Set RUN_LARGE_TESTS=1 to run 100MB stress test.",
+    )
+    def test_100mb_data(self):
+        """Round-trip works for a 100MB payload."""
+        data = (bytes(range(256)) * (100 * 1024 * 1024 // 256 + 1))[: 100 * 1024 * 1024]
         frags = encode(data, n=5, m=3)
         assert decode(frags[:3]) == data
 

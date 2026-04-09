@@ -276,6 +276,38 @@ class TestClientGet:
 
 
 # ---------------------------------------------------------------------------
+# TestClientEdgeCases
+# ---------------------------------------------------------------------------
+
+
+class TestClientEdgeCases:
+    """Edge-case coverage for payload handling."""
+
+    def test_put_empty_data_raises_value_error(self, client):
+        """Empty payloads are rejected by the encoder (non-empty fragments required)."""
+        with pytest.raises(ValueError):
+            client.put("empty-block", b"")
+
+    def test_put_get_binary_data_round_trip(self, client, servers):
+        """Binary payloads (including all byte values) round-trip correctly."""
+        binary_data = bytes(range(256)) * 32  # 8KB binary payload
+        block_id = "binary-block"
+        fragments = encode(binary_data, n=_N, m=_M, block_id=block_id)
+        fpcc_json = FingerprintedCrossChecksum.generate(fragments).to_json()
+
+        url_map: dict[str, MagicMock] = {}
+        for i in range(_N):
+            url = _fragment_url(servers[i].port, block_id, i)
+            body = _get_body(fragments[i], fpcc_json)
+            url_map[url] = _http_response(200, body)
+        mock_http = _mock_http(url_map)
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            result = client.get(block_id)
+
+        assert result == binary_data
+
+
+# ---------------------------------------------------------------------------
 # TestClientDelete
 # ---------------------------------------------------------------------------
 

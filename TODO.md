@@ -219,10 +219,9 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Write integration tests for full workflows
-- [ ] Test edge cases: empty files, 100MB files, binary data
-- [ ] Test concurrent clients accessing same object
-- [ ] Performance testing: measure throughput (objects/sec)
+- [x] Test edge cases: empty files, 100MB files, binary data
+- [x] Test concurrent clients accessing same object
+- [x] Performance testing: measure throughput (objects/sec)
 - [ ] **Security Model §12.1:** Write Deployment Recommendations
 - [ ] **Security Model §13.2:** Write Code Review Process
 - [ ] **Security Model §13.3:** Write Regression Testing
@@ -365,10 +364,10 @@
 | §2.2 Out of Scope | Albert | Week 4 |
 | §3.1 Primary Use Case | Mac | Week 4 |
 | §3.2 Anti-Scenarios | Mac | Week 4 |
-| §4.1 External Libraries | Mac | ✅ Done |
+| §4.1 External Libraries | Mac | Week 4 |
 | §4.2 System Dependencies | Albert | Week 4 |
-| §5 Implementation Assumptions | Albert | ✅ Done |
-| §6.1 Administrator | Albert | ✅ Done |
+| §5 Implementation Assumptions | Albert | Week 4 |
+| §6.1 Administrator | Albert | Week 4 |
 | §6.2 Authenticated Client | Mac | Week 4 |
 | §6.3 Storage Server | Albert | Week 4 |
 | §6.4 Untrusted Network | Mac | Week 4 |
