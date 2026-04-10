@@ -11,8 +11,14 @@
 
 \subsection{Deployment Recommendations}
 
-% COMMENT: Provide guidance on secure deployment of veri-store. What network configurations are
-% recommended? Should servers be isolated? What authentication mechanisms should be used?
+We recommend a simple but safe deployment setup:
+\begin{itemize}
+    \item Keep the five storage servers on a private network and do not expose them directly to the public internet.
+    \item Use HTTPS through a reverse proxy if clients are not running on localhost.
+    \item Set a strong shared API token and rotate it if it is leaked.
+    \item Run each server process with limited filesystem permissions so it can only access its own data folder.
+    \item Turn on request logging so failed verification events are easy to trace during debugging and demos.
+\end{itemize}
 
 \subsection{Known Limitations}
 

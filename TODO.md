@@ -222,9 +222,9 @@
 - [x] Test edge cases: empty files, 100MB files, binary data
 - [x] Test concurrent clients accessing same object
 - [x] Performance testing: measure throughput (objects/sec)
-- [ ] **Security Model §12.1:** Write Deployment Recommendations
-- [ ] **Security Model §13.2:** Write Code Review Process
-- [ ] **Security Model §13.3:** Write Regression Testing
+- [x] **Security Model §12.1:** Write Deployment Recommendations
+- [x] **Security Model §13.2:** Write Code Review Process
+- [x] **Security Model §13.3:** Write Regression Testing
 
 #### Joint
 

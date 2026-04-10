@@ -1,4 +1,5 @@
 from __future__ import annotations
+from src.network.client import RetrievalError, ServerAddress, VeriStoreClient
 
 import argparse
 import os
@@ -7,11 +8,14 @@ import sys
 import time
 from pathlib import Path
 
+
+# script to run the test
+# VERI_STORE_TOKEN=test-token ./scripts/run_servers.sh
+# VERI_STORE_TOKEN=test-token python3 scripts/benchmark_throughput.py --objects 20 --size-bytes 65536
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-from src.network.client import RetrievalError, ServerAddress, VeriStoreClient
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +26,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--start-port", type=int, default=5001)
     parser.add_argument("--servers", type=int, default=5)
     parser.add_argument("--m", type=int, default=3)
-    parser.add_argument("--token", type=str, default=os.environ.get("VERI_STORE_TOKEN", ""))
+    parser.add_argument("--token", type=str,
+                        default=os.environ.get("VERI_STORE_TOKEN", ""))
     parser.add_argument("--prefix", type=str, default="throughput")
     return parser.parse_args()
 
@@ -30,7 +35,8 @@ def parse_args() -> argparse.Namespace:
 def build_servers(host: str, start_port: int, count: int) -> list[ServerAddress]:
     servers: list[ServerAddress] = []
     for i in range(count):
-        servers.append(ServerAddress(server_id=i + 1, host=host, port=start_port + i))
+        servers.append(ServerAddress(server_id=i + 1,
+                       host=host, port=start_port + i))
     return servers
 
 
@@ -44,7 +50,8 @@ def main() -> int:
         raise ValueError("Missing token; pass --token or set VERI_STORE_TOKEN")
 
     servers = build_servers(args.host, args.start_port, args.servers)
-    client = VeriStoreClient(servers=servers, m=args.m, token=args.token, timeout=10.0)
+    client = VeriStoreClient(servers=servers, m=args.m,
+                             token=args.token, timeout=10.0)
     payload = secrets.token_bytes(args.size_bytes)
 
     stored_keys: list[str] = []
@@ -81,10 +88,14 @@ def main() -> int:
     total_elapsed = put_elapsed + get_elapsed
     total_throughput = total_ops / total_elapsed if total_elapsed > 0 else 0.0
 
-    print(f"objects={args.objects} size_bytes={args.size_bytes} put_ok={put_ok} get_ok={get_ok}")
-    print(f"put_seconds={put_elapsed:.4f} put_objects_per_sec={put_throughput:.2f}")
-    print(f"get_seconds={get_elapsed:.4f} get_objects_per_sec={get_throughput:.2f}")
-    print(f"total_seconds={total_elapsed:.4f} total_ops_per_sec={total_throughput:.2f}")
+    print(
+        f"objects={args.objects} size_bytes={args.size_bytes} put_ok={put_ok} get_ok={get_ok}")
+    print(
+        f"put_seconds={put_elapsed:.4f} put_objects_per_sec={put_throughput:.2f}")
+    print(
+        f"get_seconds={get_elapsed:.4f} get_objects_per_sec={get_throughput:.2f}")
+    print(
+        f"total_seconds={total_elapsed:.4f} total_ops_per_sec={total_throughput:.2f}")
     return 0
 
 

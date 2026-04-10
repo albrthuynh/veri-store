@@ -17,15 +17,22 @@
 
 \subsection{Code Review Process}
 
-% COMMENT: Define the code review process for security-critical components. What criteria must
-% be met? Who performs reviews? Are there specific areas (fingerprinting, network protocol) that
-% require extra scrutiny?
+In review, we check four things:
+\begin{itemize}
+    \item The change does not weaken integrity checks or bypass verification paths.
+    \item Error handling is safe and returns clear HTTP status codes.
+    \item Input validation is still strict for API payloads.
+    \item Tests were added or updated for the changed behavior.
+\end{itemize}
 
 \subsection{Regression Testing}
 
-% COMMENT: Explain how you will prevent security regressions as the code evolves. Security tests
-% must be run on every commit. Design changes must trigger threat model review to ensure
-% assumptions remain valid.
+We keep a small set of repeatable security checks:
+\begin{itemize}
+    \item Byzantine fragment detection still rejects corrupted data.
+    \item Retrieval still succeeds with only $m$ healthy servers.
+    \item Edge-case payload tests still pass, including binary and large inputs.
+\end{itemize}
 
 \newpage
 \end{document}
