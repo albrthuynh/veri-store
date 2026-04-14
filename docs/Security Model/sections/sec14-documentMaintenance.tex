@@ -1,0 +1,75 @@
+\documentclass[../veristore_security_model.tex]{subfiles}
+
+\begin{document}
+\section{Document Maintenance}
+
+% COMMENT: Establish procedures for keeping this security model up-to-date. Specify when the
+% document should be reviewed and updated: after major design changes, when new components are
+% added, at project milestones, before releases. Assign responsibility for maintaining the document.
+
+\subsection{Review Schedule}
+
+Security model reviews follow a predictable schedule tied to engineering milestones:
+\begin{itemize}
+    \item Weekly during active development (Sunday code review window).
+    \item At the end of each project week before TODO ownership is updated.
+    \item Before demos or external presentations where security claims are shown.
+    \item Immediately after changes to security-critical code paths, including:
+    \begin{itemize}
+        \item \texttt{src/network/server.py} request validation and verification handling.
+        \item \texttt{src/network/client.py} retrieval verification and quorum behavior.
+        \item \texttt{src/verification/verifier.py} consistency checks and decision logic.
+    \end{itemize}
+\end{itemize}
+
+Albert owns the maintenance schedule for backend-owned sections, Mac owns the same process for security-owned sections, and Section 14 status is confirmed jointly during weekly sync.
+
+\subsection{Change Process}
+
+All updates to this document use the same workflow as code changes:
+\begin{enumerate}
+    \item Identify trigger: a new threat, mitigation change, dependency update, or behavior change in implementation.
+    \item Update the relevant section in \texttt{docs/Security Model/sections/} with concrete impact and file/function references when available.
+    \item Run peer review with the section owner pair (Albert/Mac) during the next scheduled review, or immediately for high-risk changes.
+    \item Merge the documentation update in the same PR as the code change when possible; otherwise link the follow-up documentation PR in the code PR notes.
+    \item Record the update in Section 14.3 (Version History) with date and summary.
+\end{enumerate}
+
+If an implementation change affects a documented mitigation but the document is not updated in the same cycle, the change is considered incomplete until the security model is synchronized.
+
+\subsection{Version History}
+
+\begin{itemize}
+    \item \textbf{Version 0.1} (February 16, 2026): Initial draft - high-level security model with component stubs
+    \item \textbf{Version 0.1.001} (February 16, 2026):
+    \begin{itemize}
+        \item Added descriptions of external libraries
+        \item Added Administrator trust level and example administrators
+    \end{itemize}
+    \item \textbf{Version 0.1.002} (March 1, 2026):
+    \begin{itemize}
+        \item Split \texttt{.tex} file into sections for easier maintenance.
+        \item Changes to preamble re: formatting and spacing.
+    \end{itemize}
+    \item \textbf{Version 0.1.1} (March 15, 2026):
+    \begin{itemize}
+        \item Completed sections 1.1 and 1.2.
+        \item Inserted a \textbackslash\texttt{newpage} control at the end of each section document.
+        \item Completed section 3
+        \item Completed section 6.2 \& 6.4
+        \item Updated and verified section 4.1
+    \end{itemize}
+    \item \textbf{Version 0.1.2} (March 28, 2026):
+    \begin{itemize}
+        \item Completed Section 8, ``Protected Assets''
+    \end{itemize}
+    \item \textbf{Version 0.2.0} (April 4, 2026):
+    \begin{itemize}
+        \item Added Section 10 intro, ``Security Guarantees Achieved''
+        \item Added Section 10.1, ``Spoofing''
+        \item Added Section 10.2, ``Tampering''
+    \end{itemize}
+\end{itemize}
+
+\newpage
+\end{document}

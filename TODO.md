@@ -139,7 +139,7 @@
 
 - [x] End-to-end test: client uploads object, 5 servers receive fragments
 - [x] Test retrieval: client fetches object successfully
-- [ ] **Security Model:** Review §8 and §9.1 together; verify DFD matches implementation
+- [x] **Security Model:** Review §8 and §9.1 together; verify DFD matches implementation
 
 ---
 
@@ -248,13 +248,10 @@
 
 #### Albert (Systems/Backend)
 
-- [ ] Measure end-to-end latency (PUT and GET)
-- [ ] Profile code: find bottlenecks (erasure coding? network?)
-- [ ] Optimize hot paths if possible
-- [ ] Create architecture diagram and system documentation
-- [ ] **Security Model §14.1:** Write Review Schedule
-- [ ] **Security Model §14.2:** Write Change Process
-- [ ] **Security Model:** Final proofreading pass — Albert sections (§2, §4.2, §5, §6.1, §6.3, §7, §9.1, §10.3, §10.4, §11.3, §11.4, §12.1, §13.2, §13.3)
+- [x] Measure end-to-end latency (PUT and GET)
+- [x] **Security Model §14.1:** Write Review Schedule
+- [x] **Security Model §14.2:** Write Change Process
+- [x] **Security Model:** Final proofreading pass — Albert sections (§2, §4.2, §5, §6.1, §6.3, §7, §9.1, §10.3, §10.4, §11.3, §11.4, §12.1, §13.2, §13.3)
 
 #### Joint
 
