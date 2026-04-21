@@ -46,7 +46,7 @@ class ObjectMetadata:
     def to_dict(self) -> dict:
         """ Serialize to a JSON-compatible dictionary. """
         if self.last_verified_at is None:
-            return None
+            return {"error" : "last_verified_at is None, cannot serialize to dict."}
 
         return {
             "block_id": self.block_id,
