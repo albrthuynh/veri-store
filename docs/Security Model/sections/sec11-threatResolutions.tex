@@ -51,34 +51,48 @@
 
 \subsubsection{T.1: Fragment Corruption in Storage}
 \begin{itemize}
-\item \textbf{Status}: % Already mitigated by homomorphic fingerprint verification
-\item \textbf{Resolution}: % Cross-checksum protocol detects corrupted fragments
-\item \textbf{Owner}: %
-\item \textbf{Testing}: % Test suite injects corrupted fragments and verifies detection
+    \item \textbf{Status}: Mitigated in current implementation
+    \item \textbf{Resolution}: Veri-Store detects byte-level corruption of stored fragments during verification and retrieval. Each fragment is checked against the stored \texttt{fpcc} using a \texttt{SHA-256} hash check, and for indices $i < m$, an additional homomorphic fingerprint check.
+    
+    A storage server can still alter bytes on disk, but the modified fragment will not verify against the original \texttt{fpcc} and will therefore be rejected before reconstruction. In the current 3-of-5 deployment, the system can tolerate such tampering as long as at least $m = 3$ honest fragments remain available.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: Use the existing verifier and client retrieval tests that inject corrupted fragment bytes and confirm that verification returns \texttt{HASH\_MISMATCH} or otherwise rejects the tampered fragment. 
+    
+    End-to-end tests should also confirm that retrieval succeeds when fewer than $n - m = 2$ fragments are corrupted and fails cleanly when too many fragments are corrupted.
 \end{itemize}
 
 \subsubsection{T.2: Fragment Modification in Transit}
 \begin{itemize}
-\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
-\item \textbf{Resolution}: % Description of how this threat will be addressed
-\item \textbf{Owner}: % Person responsible for implementation/verification
-\item \textbf{Testing}: % How this mitigation will be verified
+    \item \textbf{Status}: Partially mitigated in current implementation
+    \item \textbf{Resolution}: If an attacker modifies fragment bytes while they are in transit, the modified payload will usually be detected by the \texttt{fpcc}-based verification used for storage integrity, described in section T.1. The receiving server checks uploaded fragments during \texttt{PUT}, and the client re-verifies fragments during \texttt{GET} before reconstruction.
+    
+    As a result, byte-level tampering of fragment payloads does not normally succeed silently. However, this mitigation applies only when the fragment is checked against a trusted \texttt{fpcc}. If the attacker can also tamper with the texttt{fpcc} or impersonate a server, the attack becomes part of the threats described in sections T.3 or S.2 rather than a simple fragment-byte modification. For that reason, in a production deployment, transport hardening such as TLS is recommended.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: Verify that tampering with fragment bytes in \texttt{PUT} requests causes the server to reject the fragment with \texttt{HTTP 422}, and that tampering with bytes in \texttt{GET} responses causes the client to discard the fragments during retrieval. For deployment hardening, add integration tests confirming that transport protections prevent or survate in-transit modification attempts.
 \end{itemize}
 
 \subsubsection{T.3: Fingerprint Tampering}
 \begin{itemize}
-\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
-\item \textbf{Resolution}: % Description of how this threat will be addressed
-\item \textbf{Owner}: % Person responsible for implementation/verification
-\item \textbf{Testing}: % How this mitigation will be verified
+    \item \textbf{Status}: Requires mitigation
+    \item \textbf{Resolution}: The current verification logic proves that a fragment is consistent with the \texttt{fpcc} supplied to the checker, but it does not independently authenticate the source of that \texttt{fpcc}. An attacker who can alter both fragment data and the associated \texttt{fpcc} can construct a forged pair that remains internally consistent. During retrieval, the client currently adopts the first successful \texttt{fpcc} it receives as the reference value, so a malicious server or colluding set of servers can potentially cause corrupted fragments to be accepted if they all present the same forged \texttt{fpcc}. 
+    
+    This can be mitigated by binding retrieval to a trusted \texttt{fpcc}, such as by storing the original client-generated \texttt{fpcc} locally, retrieving it from a trusted metadata service, or authenticating it with a digital signature or MAC. Cross-server agreement alone is not sufficient, because multiple malicious servers can agree on the same forged metadata.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: Add tests in which a server returns a forged \texttt{fpcc} together with tampered fragment data, and confirm that the client rejects the response when compared against a trusted stored \texttt{fpcc}. A stronger test will consist of $m$ colluding malicious servers that all return the same forged \texttt{fpcc} \textendash{} retrieval should still fail once the client verifies against the trusted original \texttt{fpcc} rather than a server-supplied one.
 \end{itemize}
 
 \subsubsection{T.4: Erasure Code Parameter Manipulation}
 \begin{itemize}
-\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
-\item \textbf{Resolution}: % Description of how this threat will be addressed
-\item \textbf{Owner}: % Person responsible for implementation/verification
-\item \textbf{Testing}: % How this mitigation will be verified
+    \item \textbf{Status}: Partially mitigated, but requires additional mitigation
+    \item \textbf{Resolution}: The current implementation already validates some coding-parameter tampering, but not all of it. On \texttt{PUT}, malformed requests with impossible parameters such as \texttt{threshold\_m > total\_n} are rejected by request validation, and duplicate writes with conflicting metadata are rejected with \texttt{HTTP 409}. During decode, the client also checks that all accepted fragments agree on \texttt{block\_id}, \texttt{total\_n}, and \texttt{threshold\_m}. These controls limit straightforward manipulation of coding parameters. 
+    
+    However, the decoder currently takes \texttt{original\_length} from the first accepted fragment and does not cross-check it against the other verified fragments. As a result, a malicious server whose response is accepted first can potentially cause silent truncation or padding effects in the reconstructed output. 
+    
+    The mitigation is to authenticate all reconstruction metadata as part of a trusted object manifest or bind it cryptographically to the trusted \texttt{fpcc}, and to require the client to confirm that all accepted fragments agree on \texttt{original\_length} before decoding.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: The existing validation tests reject impossible \texttt{PUT} (e.g., \texttt{threshold\_m > total\_n}). 
+    
+    Add retrieval tests where one fragment reports manipulated \texttt{total\_n}, \texttt{threshold\_m}, and/or \newline \texttt{original\_length}. The client should fail closed on metadata disagreement, and after the mitigation is implemented, tests should verify that a forged \texttt{original\_length} can no longer silently truncate or extend reconstructed output.
 \end{itemize}
 
 \subsection{Repudiation Threat Resolutions}
@@ -120,7 +134,7 @@
 \subsubsection{I.2: Storage Server Data Access}
 \begin{itemize}
 \item \textbf{Status}: Accepted risk with operational controls
-\item \textbf{Resolution}: Storage servers have direct filesystem access to fragment data at rest in the data/server\_N directories. A single compromised server can read its local fragments but cannot reconstruct complete objects without collecting at least m fragments from other servers. In production, operators should use standard operating system access controls to restrict filesystem access to the server process user account. For stronger confidentiality, applications can encrypt data before submitting it to veri-store, treating the storage system as untrusted infrastructure.
+\item \textbf{Resolution}: Storage servers have direct filesystem access to fragment data at rest in the \newline \texttt{data/server\_N} directories. A single compromised server can read its local fragments but cannot reconstruct complete objects without collecting at least m fragments from other servers. In production, operators should use standard operating system access controls to restrict filesystem access to the server process user account. For stronger confidentiality, applications can encrypt data before submitting it to veri-store, treating the storage system as untrusted infrastructure.
 \item \textbf{Owner}: Albert
 \item \textbf{Testing}: Review filesystem permissions on fragment storage directories. Verify that only the server process owner can read fragment files. For encrypted deployments, verify that stored fragments contain ciphertext rather than plaintext by examining on-disk data.
 \end{itemize}
