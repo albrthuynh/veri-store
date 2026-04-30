@@ -13,26 +13,38 @@
 
 \subsubsection{S.1: Client Impersonation}
 \begin{itemize}
-\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
-\item \textbf{Resolution}: % Description of how this threat will be addressed
-\item \textbf{Owner}: % Person responsible for implementation/verification
-\item \textbf{Testing}: % How this mitigation will be verified
+    \item \textbf{Status}: Requires mitigation for multi-user deployment. Partially mitigated by current design.
+    \item \textbf{Resolution}: The current implementation requires a bearer token on all \texttt{PUT}, \texttt{GET}, and \texttt{DELETE} endpoints, which blocks unauthenticated clients from impersonating a legitimate caller. The FastAPI server refuses to start without a configured \texttt{VERI\_STORE\_TOKEN} and each route verifies the supplied bearer token before any fragment operation is performed.
+    
+    For the current single-client implementation, this token is shared across the deployment rather than bound to an individual user identity, so any party that learns the token can still act as the client and access any known block identifier. A production deployment would therefore need to extend this design with per-user authentication and authorization and enforcing ownership checks on endpoint calls.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: Integration tests should verify that \texttt{PUT}, \texttt{GET}, and \texttt{DELETE} requests with an invalid or missing bearer token return \texttt{HTTP 401}, while the \texttt{/health} endpoint remains publicly accessible. Configuration tests should verify that the server fails to initialize when \texttt{VERI\_STORE\_TOKEN} is not set.
+    
+    For a future multiple-user implementation, authorization tests should be added to confirm that one authenticated user cannot retrieve, overwrite, or delete a fragment belonging to a different authenticated user.
 \end{itemize}
 
 \subsubsection{S.2: Server Impersonation}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+    \item \textbf{Status}: Accepted risk for current implementation. Would require mitigation for any networked production deployment.
+    \item \textbf{Resolution}: In the current implementation, the client communicates with the servers over HTTP in the clear using configured host and port values and does not verify a server certificate, pinned key, or other server identity credentials before sending or accepting fragment data. As a result, bearer token authentication protects the server from unauthenticated clients, but it does not protect the client from sending fragments to an adversarial endpoint that successfully impersonate a storage server.
+    
+    This is considered an acceptable risk in this prototype since the deployment is limited to trusted \texttt{localhost} processes on a single machine. For any non-local or multi-host deployment, however, Veri-Store should run behind TLS with certificate validation and infrastructure-level server authentication, so that the client can confirm it is communicating with the intended storage node before transmitting fragment data or trusting retrieval responses.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: For this prototype, manually verify that only \texttt{localhost} endpoints are targeted and does not claim transport security beyond that environment.
+    
+    For a production deployment, integration tests should confirm that the client rejects connections with invalid, expired, or mismatched server certificates, and accepts connections only when the certificate chain and expected server identity are successfully validated.
 \end{itemize}
 
 \subsubsection{S.3: Fingerprint Source Forgery}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+    \item \textbf{Status}: Requires mitigation
+    \item \textbf{Resolution}: During retrieval, the client currently trusts the first successful \texttt{fpcc\_json} it receives and uses it as the reference value for subsequent fragment verification. This means the client verifies the fragment consistency against a server-supplied \texttt{fpcc}, not against a separately trusted record. A byzantine server, or a set of colluding byzantine servers, can therefore construct a forged \texttt{fpcc} that is internally consistent with corrupted fragments. If at least $m$ servers return the same forged \texttt{fpcc}, the client may accept those fragments and reconstruct corrupted data without detecting the deception.
+    
+    The mitigation is to establish an authenticated source of truth for the \texttt{fpcc}. For example, the client should persist the original \texttt{fpcc} produced at \texttt{PUT} time and compare all retrieved fragments against the retained value, or the system should store a signed MAC-protected \texttt{fpcc} in a trusted metadata service.
+    
+    Cross-server agreement alone is not sufficient, because multiple malicious servers can agree on the same forged metadata.
+    \item \textbf{Owner}: Mac
+    \item \textbf{Testing}: Add retrieval tests in which one server returns a forged \texttt{fpcc} and corrupted fragment, confirming the client rejects it when compared against a trusted stored \texttt{fpcc}. Add a stronger adversarial test in which $m$ colluding servers return the same forged \texttt{fpcc} and mutually consistent corrupted fragments and verify that retrieval still fails once the client uses the trusted original \texttt{fpcc} rather than a server-supplied one. Regression tests should also verify that honest retrieval still succeeds when all servers return the correct \texttt{fpcc}.
 \end{itemize}
 
 \subsection{Tampering Threat Resolutions}
@@ -47,26 +59,26 @@
 
 \subsubsection{T.2: Fragment Modification in Transit}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
+\item \textbf{Resolution}: % Description of how this threat will be addressed
+\item \textbf{Owner}: % Person responsible for implementation/verification
+\item \textbf{Testing}: % How this mitigation will be verified
 \end{itemize}
 
 \subsubsection{T.3: Fingerprint Tampering}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
+\item \textbf{Resolution}: % Description of how this threat will be addressed
+\item \textbf{Owner}: % Person responsible for implementation/verification
+\item \textbf{Testing}: % How this mitigation will be verified
 \end{itemize}
 
 \subsubsection{T.4: Erasure Code Parameter Manipulation}
 \begin{itemize}
-\item \textbf{Status}: %
-\item \textbf{Resolution}: %
-\item \textbf{Owner}: %
-\item \textbf{Testing}: %
+\item \textbf{Status}: % Requires mitigation / Dependency responsibility / Accepted risk
+\item \textbf{Resolution}: % Description of how this threat will be addressed
+\item \textbf{Owner}: % Person responsible for implementation/verification
+\item \textbf{Testing}: % How this mitigation will be verified
 \end{itemize}
 
 \subsection{Repudiation Threat Resolutions}
