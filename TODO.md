@@ -210,7 +210,7 @@
 #### Mac (Security/Software Engineering)
 
 - [X] Write comprehensive security test suite
-- [ ] Test collision probability empirically (try to find collisions)
+- [X] Test collision probability empirically (try to find collisions)
 - [ ] Penetration testing: try to break integrity guarantees
 - [ ] Verify Theorem 3.4 bound holds empirically
 - [ ] **Security Model §12.2:** Write Known Limitations
