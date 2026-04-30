@@ -66,9 +66,9 @@
     \item \textbf{Status}: Partially mitigated in current implementation
     \item \textbf{Resolution}: If an attacker modifies fragment bytes while they are in transit, the modified payload will usually be detected by the \texttt{fpcc}-based verification used for storage integrity, described in section T.1. The receiving server checks uploaded fragments during \texttt{PUT}, and the client re-verifies fragments during \texttt{GET} before reconstruction.
     
-    As a result, byte-level tampering of fragment payloads does not normally succeed silently. However, this mitigation applies only when the fragment is checked against a trusted \texttt{fpcc}. If the attacker can also tamper with the texttt{fpcc} or impersonate a server, the attack becomes part of the threats described in sections T.3 or S.2 rather than a simple fragment-byte modification. For that reason, in a production deployment, transport hardening such as TLS is recommended.
+    As a result, byte-level tampering of fragment payloads does not normally succeed silently. However, this mitigation applies only when the fragment is checked against a trusted \texttt{fpcc}. If the attacker can also tamper with the \texttt{fpcc} or impersonate a server, the attack becomes part of the threats described in sections T.3 or S.2 rather than a simple fragment-byte modification. For that reason, in a production deployment, transport hardening such as TLS is recommended.
     \item \textbf{Owner}: Mac
-    \item \textbf{Testing}: Verify that tampering with fragment bytes in \texttt{PUT} requests causes the server to reject the fragment with \texttt{HTTP 422}, and that tampering with bytes in \texttt{GET} responses causes the client to discard the fragments during retrieval. For deployment hardening, add integration tests confirming that transport protections prevent or survate in-transit modification attempts.
+    \item \textbf{Testing}: Verify that tampering with fragment bytes in \texttt{PUT} requests causes the server to reject the fragment with \texttt{HTTP 422}, and that tampering with bytes in \texttt{GET} responses causes the client to discard the fragments during retrieval. For deployment hardening, add integration tests confirming that transport protections prevent or survive in-transit modification attempts.
 \end{itemize}
 
 \subsubsection{T.3: Fingerprint Tampering}
@@ -77,6 +77,8 @@
     \item \textbf{Resolution}: The current verification logic proves that a fragment is consistent with the \texttt{fpcc} supplied to the checker, but it does not independently authenticate the source of that \texttt{fpcc}. An attacker who can alter both fragment data and the associated \texttt{fpcc} can construct a forged pair that remains internally consistent. During retrieval, the client currently adopts the first successful \texttt{fpcc} it receives as the reference value, so a malicious server or colluding set of servers can potentially cause corrupted fragments to be accepted if they all present the same forged \texttt{fpcc}. 
     
     This can be mitigated by binding retrieval to a trusted \texttt{fpcc}, such as by storing the original client-generated \texttt{fpcc} locally, retrieving it from a trusted metadata service, or authenticating it with a digital signature or MAC. Cross-server agreement alone is not sufficient, because multiple malicious servers can agree on the same forged metadata.
+
+    See also section S.3.
     \item \textbf{Owner}: Mac
     \item \textbf{Testing}: Add tests in which a server returns a forged \texttt{fpcc} together with tampered fragment data, and confirm that the client rejects the response when compared against a trusted stored \texttt{fpcc}. A stronger test will consist of $m$ colluding malicious servers that all return the same forged \texttt{fpcc} \textendash{} retrieval should still fail once the client verifies against the trusted original \texttt{fpcc} rather than a server-supplied one.
 \end{itemize}
@@ -90,7 +92,7 @@
     
     The mitigation is to authenticate all reconstruction metadata as part of a trusted object manifest or bind it cryptographically to the trusted \texttt{fpcc}, and to require the client to confirm that all accepted fragments agree on \texttt{original\_length} before decoding.
     \item \textbf{Owner}: Mac
-    \item \textbf{Testing}: The existing validation tests reject impossible \texttt{PUT} (e.g., \texttt{threshold\_m > total\_n}). 
+    \item \textbf{Testing}: The existing validation tests reject impossible \texttt{PUT} requests (e.g., \texttt{threshold\_m > total\_n}). 
     
     Add retrieval tests where one fragment reports manipulated \texttt{total\_n}, \texttt{threshold\_m}, and/or \newline \texttt{original\_length}. The client should fail closed on metadata disagreement, and after the mitigation is implemented, tests should verify that a forged \texttt{original\_length} can no longer silently truncate or extend reconstructed output.
 \end{itemize}
