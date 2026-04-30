@@ -182,8 +182,8 @@
 - [X] Add request validation (check payload structure)
 - [X] Implement rate limiting per client
 - [X] Add security headers to HTTP responses
-- [ ] **Security Model §11.1:** Write Spoofing threat resolutions (S.1, S.2, S.3)
-- [ ] **Security Model §11.2:** Write Tampering threat resolutions (T.1, T.2, T.3, T.4)
+- [X] **Security Model §11.1:** Write Spoofing threat resolutions (S.1, S.2, S.3)
+- [X] **Security Model §11.2:** Write Tampering threat resolutions (T.1, T.2, T.3, T.4)
 
 #### Albert (Systems/Backend)
 
@@ -209,7 +209,7 @@
 
 #### Mac (Security/Software Engineering)
 
-- [ ] Write comprehensive security test suite
+- [X] Write comprehensive security test suite
 - [ ] Test collision probability empirically (try to find collisions)
 - [ ] Penetration testing: try to break integrity guarantees
 - [ ] Verify Theorem 3.4 bound holds empirically

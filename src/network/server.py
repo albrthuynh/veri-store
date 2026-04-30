@@ -21,6 +21,7 @@ import base64
 import logging
 import os
 import time
+import threading
 from pathlib import Path as _Path
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Request
@@ -84,6 +85,19 @@ def create_app(
     app = FastAPI(title=f"veri-store server {server_id}")
     store = FragmentStore(f"{data_dir}/server_{server_id}")
     
+    fragment_locks: dict[tuple[str, int], threading.Lock] = {}
+    fragment_locks_guard = threading.Lock()
+
+    def get_fragment_lock(block_id: str, index: int) -> threading.Lock:
+        key = (block_id, index)
+
+        with fragment_locks_guard:
+            lock = fragment_locks.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                fragment_locks[key] = lock
+            return lock
+
     rate_limiter = SlidingWindowRateLimiter(
         max_requests=rate_limit_max_requests,
         window_seconds=rate_limit_window_seconds
@@ -202,7 +216,8 @@ def create_app(
             fragment_size,
         )
 
-        response = put_fragment(block_id, index, body, store, server_id)
+        with get_fragment_lock(block_id, index):
+            response = put_fragment(block_id, index, body, store, server_id)
 
         _log.info(
             "[server %d] Stored fragment: block_id=%s, index=%d, status=%s",

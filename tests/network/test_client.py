@@ -9,6 +9,8 @@ Covers:
     - get() collects m fragments, verifies them, and decodes correctly
     - get() raises RetrievalError when fewer than m verified fragments available
     - get() re-verifies fragments and rejects corrupt server responses
+    - get() rejects mismatched fpcc metadata across servers
+    - get() skips malformed base64 and invalid response bodies
     - delete() sends DELETE to all servers (ignores 404)
     - health_check() returns True for responding servers, False for unreachable
 """
@@ -197,6 +199,24 @@ class TestClientPut:
             with pytest.raises(DispersalError):
                 client.put(_BLOCK_ID, _DATA)
 
+    def test_put_includes_bearer_token_header(self, servers):
+        """put() forwards the configured bearer token on each request."""
+        client = VeriStoreClient(servers=servers, m=_M, token="secret-token")
+
+        url_map ={
+            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(200, _put_body(_BLOCK_ID, i))
+            for i in range(_N)
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            client.put(_BLOCK_ID, _DATA)
+
+        put_calls = [c for c in mock_http.request.call_args_list if c.args[0] == "PUT"]
+        assert len(put_calls) == _N
+        for call in put_calls:
+            assert call.kwargs["headers"]["Authorization"] == "Bearer secret-token"
+
 
 # ---------------------------------------------------------------------------
 # TestClientGet
@@ -274,6 +294,161 @@ class TestClientGet:
             with pytest.raises(RetrievalError):
                 client.get(_BLOCK_ID)
 
+    def test_get_skips_mismatched_fpcc_and_still_recovers_with_m_honest(self, client, servers, encoded):
+        """Fragments with a different fpcc_json are treated as untrusted and skipped."""
+        fragments, fpcc_json = encoded
+
+        other_fragments = encode(b"different block entirely", n=_N, m=_M, block_id="other-block")
+        other_fpcc_json = FingerprintedCrossChecksum.generate(other_fragments).to_json()
+
+        url_map = {
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(
+                200, _get_body(fragments[0], fpcc_json)
+            ),
+            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
+                200, _get_body(fragments[1], other_fpcc_json)
+            ),
+            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(
+                200, _get_body(fragments[2], fpcc_json)
+            ),
+            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(
+                200, _get_body(fragments[3], other_fpcc_json)
+            ),
+            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(
+                200, _get_body(fragments[4], fpcc_json)
+            ),
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            with patch("src.network.client.as_completed", side_effect=lambda futures: futures):
+                result = client.get(_BLOCK_ID)
+
+        assert result == _DATA
+
+    def test_get_raises_when_too_few_fragments_share_same_fpcc(
+        self, client, servers, encoded
+    ):
+        """Retrieval fails if fewer than m responses agree on the fpcc metadata."""
+        fragments, fpcc_json = encoded
+
+        other_fragments = encode(b"different block entirely", n=_N, m=_M, block_id="other-block")
+        other_fpcc_json = FingerprintedCrossChecksum.generate(other_fragments).to_json()
+
+        url_map = {
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(
+                200, _get_body(fragments[0], fpcc_json)
+            ),
+            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
+                200, _get_body(fragments[1], fpcc_json)
+            ),
+            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(
+                200, _get_body(fragments[2], other_fpcc_json)
+            ),
+            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(
+                200, _get_body(fragments[3], other_fpcc_json)
+            ),
+            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(
+                200, _get_body(fragments[4], other_fpcc_json)
+            ),
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            with patch("src.network.client.as_completed", side_effect=lambda futures: futures):
+                with pytest.raises(RetrievalError, match="only 2 verified fragments available"):
+                    client.get(_BLOCK_ID)
+
+    def test_get_skips_malformed_base64_and_still_recovers(self, client, servers, encoded):
+        """Malformed fragment_data is ignored rather than crashing retrieval."""
+        fragments, fpcc_json = encoded
+
+        bad_body = _get_body(fragments[0], fpcc_json)
+        bad_body["fragment_data"] = "not-valid-base64!!!"
+
+        url_map = {
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(200, bad_body),
+            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
+                200, _get_body(fragments[1], fpcc_json)
+            ),
+            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(
+                200, _get_body(fragments[2], fpcc_json)
+            ),
+            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(
+                200, _get_body(fragments[3], fpcc_json)
+            ),
+            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(
+                200, _get_body(fragments[4], fpcc_json)
+            ),
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            result = client.get(_BLOCK_ID)
+
+        assert result == _DATA
+
+    def test_get_skips_invalid_response_schema_and_still_recovers(
+        self, client, servers, encoded
+    ):
+        """Responses missing required fields are treated as unusable."""
+        fragments, fpcc_json = encoded
+
+        invalid_body = {"block_id": _BLOCK_ID, "index": 0}  # missing required fields
+
+        url_map = {
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(200, invalid_body),
+            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
+                200, _get_body(fragments[1], fpcc_json)
+            ),
+            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(
+                200, _get_body(fragments[2], fpcc_json)
+            ),
+            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(
+                200, _get_body(fragments[3], fpcc_json)
+            ),
+            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(
+                200, _get_body(fragments[4], fpcc_json)
+            ),
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            result = client.get(_BLOCK_ID)
+
+        assert result == _DATA
+
+    def test_get_raises_if_first_successful_fpcc_is_not_parseable(
+        self, client, servers, encoded
+    ):
+        """Retrieval fails cleanly if the baseline fpcc_json cannot be parsed."""
+        fragments, fpcc_json = encoded
+
+        bad_body = _get_body(fragments[0], fpcc_json)
+        bad_body["fpcc_json"] = "{not valid json}"
+
+        url_map = {
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(200, bad_body),
+            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
+                200, _get_body(fragments[1], fpcc_json)
+            ),
+            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(
+                200, _get_body(fragments[2], fpcc_json)
+            ),
+            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(
+                200, _get_body(fragments[3], fpcc_json)
+            ),
+            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(
+                200, _get_body(fragments[4], fpcc_json)
+            ),
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            with patch("src.network.client.as_completed", side_effect=lambda futures: futures):
+                with pytest.raises(RetrievalError, match="invalid fpcc"):
+                    client.get(_BLOCK_ID)
+
 
 # ---------------------------------------------------------------------------
 # TestClientEdgeCases
@@ -340,6 +515,26 @@ class TestClientDelete:
         with patch("src.network.client.httpx.Client", return_value=mock_http):
             client.delete(_BLOCK_ID)  # must not raise
 
+    def test_delete_includes_bearer_token_header(self, servers):
+        """delete() forwards the configured bearer token on each request."""
+        client = VeriStoreClient(servers=servers, m=_M, token="secret-token")
+
+        url_map = {
+            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(
+                200, {"block_id": _BLOCK_ID, "index": i, "message": "deleted"}
+            )
+            for i in range(_N)
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            client.delete(_BLOCK_ID)
+
+        delete_calls = [c for c in mock_http.request.call_args_list if c.args[0] == "DELETE"]
+        assert len(delete_calls) == _N
+        for call in delete_calls:
+            assert call.kwargs["headers"]["Authorization"] == "Bearer secret-token"
+    
 
 # ---------------------------------------------------------------------------
 # TestClientHealthCheck
@@ -389,3 +584,25 @@ class TestClientHealthCheck:
         unreachable = [sid for sid, ok in result.items() if not ok]
         assert len(healthy) == 3
         assert len(unreachable) == 2
+
+    def test_health_check_does_not_require_auth_token(self, servers):
+        """health_check() can probe public /health without a bearer token."""
+        client = VeriStoreClient(servers=servers, m=_M, token="")
+
+        url_map = {
+            f"http://localhost:{servers[i].port}/health": _http_response(
+                200, _health_body(servers[i].server_id)
+            )
+            for i in range(_N)
+        }
+        mock_http = _mock_http(url_map)
+
+        with patch("src.network.client.httpx.Client", return_value=mock_http):
+            result = client.health_check()
+
+        assert len(result) == _N
+        assert all(result.values())
+
+        health_calls = [c for c in mock_http.request.call_args_list if c.args[0] == "GET"]
+        for call in health_calls:
+            assert call.kwargs["headers"] == {}

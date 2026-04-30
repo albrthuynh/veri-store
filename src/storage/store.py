@@ -19,6 +19,8 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import os
+import tempfile
+import uuid
 
 from .fragment import FragmentRecord
 
@@ -60,7 +62,7 @@ class FragmentStore:
     def put(self, record: FragmentRecord) -> None:
         """Persist a fragment record to disk.
 
-        Writes atomically by serialising to a temp file then renaming.
+        Writes atomically by serialising to a temp file then renaming in the same directory and then renaming it into place.
 
         Args:
             record: The FragmentRecord to store.
@@ -72,23 +74,33 @@ class FragmentStore:
         block_dir.mkdir(parents=True, exist_ok=True)
 
         final_path = self._fragment_path(record.block_id, record.index)
-        tmp_path = final_path.with_suffix(final_path.suffix + ".tmp")
 
         payload = record.to_dict()
         data = json.dumps(payload, sort_keys=True).encode("utf-8")
 
+        tmp_path: Path | None = None
         try:
-            with open(tmp_path, "wb") as f:
+            # Give each writer its own temp file so concurrent writes to the same fragment do not contend on a shared *.tmp pathname.
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                dir=block_dir,
+                prefix=f"{final_path.name}.{uuid.uuid4().hex}.",
+                suffix=".tmp",
+                delete=False,
+            ) as f:
                 f.write(data)
                 f.flush()
                 os.fsync(f.fileno())
+                tmp_path = Path(f.name)
+
             os.replace(tmp_path, final_path)
         finally:
-            try:
-                if tmp_path.exists():
-                    tmp_path.unlink()
-            except OSError:
-                pass
+            if tmp_path is not None:
+                try:
+                    if tmp_path.exists():
+                        tmp_path.unlink()
+                except OSError:
+                    pass
 
         self._index.setdefault(record.block_id, set()).add(record.index)
 
