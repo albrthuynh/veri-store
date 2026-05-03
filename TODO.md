@@ -212,7 +212,7 @@
 - [X] Write comprehensive security test suite
 - [X] Test collision probability empirically (try to find collisions)
 - [X] Penetration testing: try to break integrity guarantees
-- [ ] Verify Theorem 3.4 bound holds empirically
+- [X] Verify Theorem 3.4 bound holds empirically
 - [ ] **Security Model §12.2:** Write Known Limitations
 - [ ] **Security Model §12.3:** Write Integration Considerations
 - [ ] **Security Model §13.1:** Write Security Test Suite
