@@ -10,10 +10,44 @@
 
 \subsection{Security Test Suite}
 
-% COMMENT: Describe the automated test suite that will verify security properties. Tests should
-% cover: fingerprint collision resistance, detection of corrupted fragments, verification protocol
-% correctness, proper handling of malformed input. Each mitigated threat should have corresponding
-% tests.
+The security test suite for Veri-Store is organized around the main integrity-critical components of the implementation: fragment hashing, homomorphic fingerprint verification, client/server protocol validation, and adversarial behavior under byzantine conditions. The goal of the suite is not only to catch regressions, but also to provide executable evidence that the implementation continues to satisfy the security claims made in this document.
+
+\subsubsection{Verification-layer unit tests}
+The verification package is covered by focused unit tests for:
+\begin{itemize}
+    \item \texttt{RandomOracle} behavior, including deterministic output, rejection of invalid input, and correct fragment hashing behavior;
+    \item \texttt{FingerprintedCrossChecksum} generation, serialization, digest stability, and consistency with the underlying fingerprint function;
+    \item \texttt{Verifier.check()} and \texttt{Verifier.batch\_check()}, including valid fragments, corrupted fragments, index errors, fingerprint mismatches, byzantine substitutions, and threshold-boundary cases.
+\end{itemize}
+
+\subsubsection{HTTP protocol and endpoint tests}
+The network-facing test suite verifies that the FastAPI layer fails closed on malformed or adversarial requests. These tests cover:
+\begin{itemize}
+    \item rejection of malformed \texttt{base64}, malformed \texttt{fpcc\_json}, and inconsistent metadata during \texttt{PUT};
+    \item correct handling of duplicate writes, invalid fragment indices, and invalid verification status persistence;
+    \item authentication requirements, rate limiting behavior, and presence of security headers on success and error responses;
+    \item retrieval-side client behavior when servers return corrupted fragments, malformed payloads, mismatched \texttt{fpcc} values, or other untrusted responses.
+\end{itemize}
+
+\subsubsection{Integration tests}
+In addition to unit and endpoint tests, an integration suite wires a real \texttt{VeriStoreClient} to multiple in-process server instances and verifies end-to-end security behavior. These tests confirm that:
+\begin{itemize}
+    \item honest 5-server dispersal and retrieval succeeds;
+    \item retrieval still succeeds with up to two byzantine servers in the current 3-of-5 deployment;
+    \item retrieval fails closed once too many servers are byzantine or unavailable;
+    \item authentication failure prevents successful dispersal.
+\end{itemize}
+
+\subsubsection{Security experiments and adversarial scripts}
+Some security properties are better evaluated experimentally than as ordinary unit tests. For that reason, Veri-Store also includes standalone scripts that complement the automated test suite:
+\begin{itemize}
+    \item a collision-probability experiment measuring empirical fingerprint and random-oracle collision rates against their theoretical expectations;
+    \item an empirical Theorem 3.4 experiment that searches for counterexamples in which two verified fragment sets decode to different blocks under the same \texttt{fpcc};
+    \item a penetration-testing harness that exercises corrupted \texttt{GET} responses, malformed inputs, replay scenarios, threshold-boundary cases, and logging behavior.
+\end{itemize}
+
+\subsubsection{Threat coverage}
+The intended maintenance rule is that each mitigated threat in Section~11 should correspond to at least one executable check in the security suite. Some threats are covered by deterministic unit or integration tests, while others are covered by repeatable experiment scripts and documented attack matrices. Together, these tests give the project a regression baseline for both ordinary bugs and security-relevant implementation drift.
 
 \subsection{Code Review Process}
 

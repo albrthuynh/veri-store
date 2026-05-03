@@ -214,7 +214,7 @@
 - [X] Penetration testing: try to break integrity guarantees
 - [X] Verify Theorem 3.4 bound holds empirically
 - [X] **Security Model §12.2:** Write Known Limitations
-- [ ] **Security Model §12.3:** Write Integration Considerations
+- [X] **Security Model §12.3:** Write Integration Considerations
 - [ ] **Security Model §13.1:** Write Security Test Suite
 
 #### Albert (Systems/Backend)
