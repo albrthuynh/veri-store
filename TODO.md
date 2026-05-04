@@ -239,8 +239,8 @@
 
 #### Mac (Security/Software Engineering)
 
-- [ ] Measure bandwidth overhead vs. replication
-- [ ] Measure verification time per fragment
+- [X] Measure bandwidth overhead vs. replication
+- [X] Measure verification time per fragment
 - [ ] Create security analysis document
 - [ ] Prepare demo: show Byzantine fault detection
 - [ ] **Security Model:** Final proofreading pass — Mac sections (§1, §3, §4.1, §6.2, §6.4, §8, §10.1, §10.2, §11.1, §11.2, §12.2, §12.3, §13.1)
