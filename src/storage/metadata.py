@@ -45,9 +45,6 @@ class ObjectMetadata:
 
     def to_dict(self) -> dict:
         """ Serialize to a JSON-compatible dictionary. """
-        if self.last_verified_at is None:
-            return {"error" : "last_verified_at is None, cannot serialize to dict."}
-
         return {
             "block_id": self.block_id,
             "total_n": self.total_n,
@@ -56,7 +53,11 @@ class ObjectMetadata:
             "fpcc": self.fpcc,
             "stored_indices": list(self.stored_indices),
             "created_at": self.created_at.isoformat(),
-            "last_verified_at": self.last_verified_at.isoformat()
+            "last_verified_at": (
+                self.last_verified_at.isoformat()
+                if self.last_verified_at is not None
+                else None
+            ),
         }
 
     @classmethod
