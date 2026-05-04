@@ -242,6 +242,10 @@
 - [X] Measure bandwidth overhead vs. replication
 - [X] Measure verification time per fragment
 - [ ] Create security analysis document
+    - [ ] Security Model: Sec 10
+    - [ ] Security Model: Sec 11
+    - [ ] Security Model: Sec 12, Limitations and Integration Notes
+    - [ ] Empirical evidence: bandwidth, verification time, penetration test, collision probability, theorem verification
 - [ ] Prepare demo: show Byzantine fault detection
 - [ ] **Security Model:** Final proofreading pass — Mac sections (§1, §3, §4.1, §6.2, §6.4, §8, §10.1, §10.2, §11.1, §11.2, §12.2, §12.3, §13.1)
 - [ ] **Security Model:** Ensure all threat resolutions reference actual implementation (file/function names where possible)
