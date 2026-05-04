@@ -55,6 +55,7 @@ nbproject
 intermediate
 publish
 build_*
+.tmp
 
 # build script local files
 config.rb
