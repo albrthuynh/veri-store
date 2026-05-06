@@ -8,7 +8,7 @@ from src.fingerprint.field import GF256
 
 def matrix_rows(matrix_like) -> list[list[int]]:
     """Return matrix contents as a list of rows containing plain ints."""
-    raw_matrix = matrix_like.matrix
+    raw_matrix = matrix_like._matrix
 
     if hasattr(raw_matrix, "tolist"):
         raw_matrix = raw_matrix.tolist()
