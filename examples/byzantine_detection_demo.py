@@ -71,6 +71,9 @@ _SERVERS = [
     for i in range(5)
 ]
 
+_DEMO_TOKEN = "test-token"
+
+
 # ---------------------------------------------------------------------------
 # Server lifecycle helpers
 # ---------------------------------------------------------------------------
@@ -89,6 +92,7 @@ def _start_servers() -> list[subprocess.Popen]:
         env = os.environ.copy()
         env["SERVER_ID"] = str(srv.server_id)
         env["DATA_DIR"] = str(data_dir)
+        env["VERI_STORE_TOKEN"] = _DEMO_TOKEN
 
         if srv.server_id == _BYZANTINE_SERVER_ID:
             env["BYZANTINE_INDICES"] = str(_BYZANTINE_FRAGMENT_INDEX)
@@ -152,7 +156,7 @@ def main() -> None:
     )
 
     procs = _start_servers()
-    client = VeriStoreClient(servers=_SERVERS, m=3, timeout=5.0)
+    client = VeriStoreClient(servers=_SERVERS, m=3, timeout=5.0, token=_DEMO_TOKEN)
 
     try:
         _wait_for_servers(client)

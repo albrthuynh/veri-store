@@ -38,6 +38,9 @@ if str(ROOT) not in sys.path:
 from src.network.client import RetrievalError, ServerAddress, VeriStoreClient
 
 
+_DEMO_TOKEN = "test-token"
+
+
 def _find_server_pids(server_id: int) -> list[int]:
     """Find uvicorn PIDs for a specific veri-store server ID by port."""
     port = 5000 + server_id
@@ -76,7 +79,12 @@ def simulate_crash(server_ids: list[int]) -> None:
 def main() -> None:
     """Run the fault tolerance demonstration with simple recovery metrics."""
     all_servers = [ServerAddress(i + 1, host="127.0.0.1", port=5001 + i) for i in range(5)]
-    client = VeriStoreClient(servers=all_servers, m=3, timeout=2.0)
+    client = VeriStoreClient(
+        servers=all_servers,
+        m=3,
+        timeout=2.0,
+        token=_DEMO_TOKEN,
+    )
 
     data = b"This data should survive server crashes."
     key = f"fault_test_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"

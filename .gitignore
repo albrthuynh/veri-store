@@ -61,3 +61,6 @@ build_*
 config.rb
 build/buildinfo.properties
 build/config/buildinfo.properties
+
+# temp data to display
+data/
