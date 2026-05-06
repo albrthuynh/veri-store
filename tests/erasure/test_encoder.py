@@ -1,16 +1,3 @@
-"""
-test_encoder.py -- Unit tests for Reed-Solomon erasure encoding.
-
-Covers:
-    - encode() returns exactly n Fragment objects
-    - All fragments share the same block_id and original_length
-    - Fragment indices are 0 .. n-1 (no gaps)
-    - All fragments have equal byte length
-    - Encoding is deterministic for fixed input
-    - Edge cases: single byte, exactly m bytes, non-multiple-of-m length (padding)
-    - block_id defaults to SHA-256 hex digest of data when not supplied
-"""
-
 import pytest
 import hashlib
 from src.erasure.encoder import encode, Fragment
@@ -60,7 +47,7 @@ class TestEncodeEdgeCases:
 
     def test_single_byte(self):
         """Encode a single byte without error."""
-        frags = encode(b"\xFF", n=5, m=3)
+        frags = encode(b"\xff", n=5, m=3)
         assert len(frags) == 5
 
     def test_data_length_not_multiple_of_m(self):

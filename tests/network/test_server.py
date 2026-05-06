@@ -1,19 +1,3 @@
-"""
-test_server.py -- Integration tests for the FastAPI server endpoints.
-
-Uses FastAPI's TestClient (wraps httpx) to exercise the HTTP layer without
-starting a real process.
-
-Covers:
-    - PUT /fragments/{block_id}/{index}: happy path, duplicate, invalid fpcc, malformed input, invalid fragments persisted for forensics
-    - GET /fragments/{block_id}/{index}: happy path, 404, metadata round-trip
-    - DELETE /fragments/{block_id}/{index}: happy path, 404
-    - GET /health: returns 200 with correct server_id
-    - Auth: protected endpoints reject missing/invalid tokens
-    - Rate limiting: 429 behavior and limit headers
-    - Response hardening: security headers on success and error responses
-"""
-
 import pytest
 import base64
 import json
@@ -79,10 +63,14 @@ def valid_store_body():
         "fpcc_json": fpcc.to_json(),
     }
 
+
 def test_create_app_without_token_raises():
     """Creating the app with an empty API token should raise an error."""
-    with pytest.raises(ValueError, match="API token must be provided for authentication"):
+    with pytest.raises(
+        ValueError, match="API token must be provided for authentication"
+    ):
         create_app(server_id=1, data_dir="/tmp", token="")
+
 
 class TestPutFragment:
     """Tests for PUT /fragments/{block_id}/{index}."""
@@ -95,7 +83,10 @@ class TestPutFragment:
 
     def test_put_invalid_fpcc_returns_422(self, client, valid_store_body):
         """A PUT with tampered fragment bytes returns 422."""
-        tampered = {**valid_store_body, "fragment_data": base64.b64encode(b"garbage").decode()}
+        tampered = {
+            **valid_store_body,
+            "fragment_data": base64.b64encode(b"garbage").decode(),
+        }
         resp = client.put("/fragments/block1/0", json=tampered)
         assert resp.status_code == 422
 
@@ -116,7 +107,9 @@ class TestPutFragment:
 
         assert resp.status_code == 422
 
-    def test_put_threshold_greater_than_total_returns_422(self, client, valid_store_body):
+    def test_put_threshold_greater_than_total_returns_422(
+        self, client, valid_store_body
+    ):
         """A PUT with threshold_m > total_n is rejected by model validation."""
         invalid_body = {**valid_store_body, "total_n": 3, "threshold_m": 4}
 
@@ -150,7 +143,10 @@ class TestPutFragment:
 
     def test_put_empty_decoded_fragment_returns_422(self, client, valid_store_body):
         """A PUT whose fragment_data decodes to zero bytes is rejected."""
-        invalid_body = {**valid_store_body, "fragment_data": base64.b64encode(b"").decode()}
+        invalid_body = {
+            **valid_store_body,
+            "fragment_data": base64.b64encode(b"").decode(),
+        }
 
         resp = client.put("/fragments/block1/0", json=invalid_body)
 
@@ -184,7 +180,10 @@ class TestPutFragment:
     def test_put_duplicate_different_data_returns_409(self, client, valid_store_body):
         """Re-sending a different fragment for the same (block_id, index) returns 409."""
         client.put("/fragments/block1/0", json=valid_store_body)
-        different = {**valid_store_body, "original_length": valid_store_body["original_length"] + 1}
+        different = {
+            **valid_store_body,
+            "original_length": valid_store_body["original_length"] + 1,
+        }
         resp = client.put("/fragments/block1/0", json=different)
         assert resp.status_code == 409
 
@@ -197,9 +196,14 @@ class TestPutFragment:
         )
         assert resp.status_code == 401
 
-    def test_put_invalid_fragment_is_persisted_for_debugging(self, client, valid_store_body):
+    def test_put_invalid_fragment_is_persisted_for_debugging(
+        self, client, valid_store_body
+    ):
         """An invalid fragment is stored but rejected with HTTP 422"""
-        tampered = {**valid_store_body, "fragment_data": base64.b64encode(b"garbage").decode()}
+        tampered = {
+            **valid_store_body,
+            "fragment_data": base64.b64encode(b"garbage").decode(),
+        }
 
         put_resp = client.put("/fragments/block1/0", json=tampered)
         get_resp = client.get("/fragments/block1/0")
@@ -211,7 +215,9 @@ class TestPutFragment:
         assert get_resp.json()["verification_status"] == "invalid"
         assert get_resp.json()["fragment_data"] == base64.b64encode(b"garbage").decode()
 
-    def test_put_index_outside_fpcc_range_returns_422_and_persists_invalid(self, client, valid_store_body):
+    def test_put_index_outside_fpcc_range_returns_422_and_persists_invalid(
+        self, client, valid_store_body
+    ):
         """A fragment whose path index is outside fpcc.n is rejected and marked invalid."""
         resp = client.put("/fragments/block1/99", json=valid_store_body)
         stored = client.get("/fragments/block1/99")
@@ -236,6 +242,7 @@ class TestPutFragment:
         finally:
             shutil.rmtree(test_root, ignore_errors=True)
 
+
 class TestGetFragment:
     """Tests for GET /fragments/{block_id}/{index}."""
 
@@ -254,7 +261,9 @@ class TestGetFragment:
 
     def test_get_unauthenticated_returns_401(self, client):
         """A GET without a valid token returns 401."""
-        resp = client.get("/fragments/block1/0", headers={"Authorization": "Bearer wrong-token"})
+        resp = client.get(
+            "/fragments/block1/0", headers={"Authorization": "Bearer wrong-token"}
+        )
         assert resp.status_code == 401
 
     def test_get_returns_original_metadata_and_fpcc(self, client, valid_store_body):
@@ -290,7 +299,9 @@ class TestDeleteFragment:
 
     def test_delete_unauthenticated_returns_401(self, client):
         """A DELETE without a valid token returns 401."""
-        resp = client.delete("/fragments/block1/0", headers={"Authorization": "Bearer wrong-token"})
+        resp = client.delete(
+            "/fragments/block1/0", headers={"Authorization": "Bearer wrong-token"}
+        )
         assert resp.status_code == 401
 
 
@@ -313,7 +324,9 @@ class TestHealthEndpoint:
 class TestRateLimiting:
     """Tests for per-client request rate limiting."""
 
-    def test_put_rate_limit_exceeded_returns_429(self, limited_client, valid_store_body):
+    def test_put_rate_limit_exceeded_returns_429(
+        self, limited_client, valid_store_body
+    ):
         """The third request within the active window is rejected with 429."""
         resp1 = limited_client.put("/fragments/block1/0", json=valid_store_body)
         resp2 = limited_client.put("/fragments/block1/0", json=valid_store_body)
@@ -344,7 +357,9 @@ class TestRateLimiting:
         assert resp2.status_code == 200
         assert resp3.status_code == 200
 
-    def test_success_response_includes_rate_limit_headers(self, limited_client, valid_store_body):
+    def test_success_response_includes_rate_limit_headers(
+        self, limited_client, valid_store_body
+    ):
         """Allowed requests include informational rate-limit headers."""
         resp = limited_client.put("/fragments/block1/0", json=valid_store_body)
 
@@ -352,7 +367,9 @@ class TestRateLimiting:
         assert resp.headers["X-RateLimit-Limit"] == "2"
         assert resp.headers["X-RateLimit-Remaining"] in {"0", "1"}
 
-    def test_unauthenticated_requests_still_count_toward_rate_limit(self, limited_client, valid_store_body):
+    def test_unauthenticated_requests_still_count_toward_rate_limit(
+        self, limited_client, valid_store_body
+    ):
         """Rate limiting runs before auth and throttles repeated bad requests too."""
 
         resp1 = limited_client.put(
@@ -375,8 +392,11 @@ class TestRateLimiting:
         assert resp2.status_code == 401
         assert resp3.status_code == 429
 
+
 class TestConcurrentAccess:
-    def test_concurrent_puts_to_same_fragment_are_idempotent(self, client, valid_store_body):
+    def test_concurrent_puts_to_same_fragment_are_idempotent(
+        self, client, valid_store_body
+    ):
         path = "/fragments/concurrent_block/0"
         workers = 10
 
@@ -452,7 +472,9 @@ class TestSecurityHeaders:
         assert resp.status_code == 404
         self._assert_security_headers(resp)
 
-    def test_unauthorized_response_includes_security_headers(self, client, valid_store_body):
+    def test_unauthorized_response_includes_security_headers(
+        self, client, valid_store_body
+    ):
         """Security headers are present on auth failures too."""
         resp = client.put(
             "/fragments/block1/0",
@@ -463,7 +485,9 @@ class TestSecurityHeaders:
         assert resp.status_code == 401
         self._assert_security_headers(resp)
 
-    def test_rate_limited_response_includes_security_headers(self, limited_client, valid_store_body):
+    def test_rate_limited_response_includes_security_headers(
+        self, limited_client, valid_store_body
+    ):
         """Security headers are preserved on middleware-generated 429 responses."""
         limited_client.put("/fragments/block1/0", json=valid_store_body)
         limited_client.put("/fragments/block1/0", json=valid_store_body)
@@ -471,3 +495,4 @@ class TestSecurityHeaders:
 
         assert resp.status_code == 429
         self._assert_security_headers(resp)
+

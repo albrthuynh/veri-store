@@ -1,14 +1,3 @@
-"""
-test_fragment.py -- Unit tests for FragmentRecord serialization.
-
-Covers:
-    - to_dict() produces a dict with all expected keys
-    - from_dict(to_dict(record)) round-trip recovers the original record
-    - bytes fields are base64-encoded in the dict
-    - VerificationStatus enum survives round-trip as a string
-    - Timestamps survive round-trip as ISO 8601 strings
-"""
-
 import base64
 from datetime import datetime
 from src.storage.fragment import FragmentRecord, VerificationStatus
@@ -21,7 +10,7 @@ class TestFragmentRecordRoundTrip:
         """from_dict(to_dict(r)) == r for a typical record."""
         record = FragmentRecord(
             index=2,
-            data=b"\xDE\xAD\xBE\xEF",
+            data=b"\xde\xad\xbe\xef",
             block_id="abc",
             total_n=5,
             threshold_m=3,

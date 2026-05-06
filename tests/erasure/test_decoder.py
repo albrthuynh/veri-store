@@ -1,16 +1,3 @@
-"""
-test_decoder.py -- Unit tests for Reed-Solomon erasure decoding.
-
-Covers:
-    - decode() with all n fragments recovers original data
-    - decode() with exactly m fragments recovers original data
-    - decode() works for every possible subset of m fragments (any m out of n)
-    - decode() strips padding and returns exactly original_length bytes
-    - decode() raises ValueError if fewer than m fragments provided
-    - decode() raises ValueError if fragments have mismatched block_ids
-    - Integration: encode then decode round-trip for various data sizes
-"""
-
 import os
 import pytest
 from itertools import combinations

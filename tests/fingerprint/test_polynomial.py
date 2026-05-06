@@ -1,15 +1,3 @@
-"""
-test_polynomial.py -- Unit tests for Polynomial over GF(2^8).
-
-Covers:
-    - from_bytes / to_bytes round-trip
-    - evaluate() with Horner's method (spot-checks against hand calculation)
-    - Polynomial addition and subtraction (coefficient-wise XOR)
-    - Polynomial multiplication (schoolbook)
-    - divide_by_linear(): verify quotient * (x - root) + remainder == original
-    - degree property
-"""
-
 from src.fingerprint.field import GF256
 from src.fingerprint.polynomial import Polynomial
 
@@ -54,7 +42,7 @@ class TestPolynomialEvaluation:
 
     def test_evaluation_at_zero(self):
         """p(0) equals the constant term."""
-        p = Polynomial.from_bytes(b"\xAB\x00\xCD")
+        p = Polynomial.from_bytes(b"\xab\x00\xcd")
         assert p.evaluate(GF256(0)) == GF256(0xAB)
 
 
@@ -99,7 +87,7 @@ class TestPolynomialDivision:
         """If root is actually a root of p, remainder is 0."""
         root = GF256(9)
         factor_a = Polynomial([GF256(5), GF256(1)])  # x - 5
-        factor_root = Polynomial([root, GF256(1)])   # x - root
+        factor_root = Polynomial([root, GF256(1)])  # x - root
         p = factor_a * factor_root
 
         _, remainder = p.divide_by_linear(root)

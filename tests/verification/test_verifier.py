@@ -1,21 +1,3 @@
-"""
-test_verifier.py -- Unit tests for the Verifier (server-side fragment check).
-
-Covers:
-    - CONSISTENT result for a valid fragment at an index in [0, m)
-    - CONSISTENT result for a valid fragment at an index in [m, n) (hash-only check)
-    - HASH_MISMATCH when fragment bytes are altered
-    - FP_MISMATCH when fingerprint data is tampered for indices < m
-    - INDEX_ERROR when fragment_index is out of range
-    - batch_check() returns one report per input, in input order
-    - Byzantine fault detection: substitution, bit flips, fragment swaps,
-      truncation, extension, parity-index swaps
-    - r is recomputed from hashes, not trusted from fpcc.r
-    - Detection probability: empirically verify that all byte-level corruptions
-      are caught (SHA-256 collision probability is negligible in practice)
-    - False positive rate is empirically zero for valid fragments
-"""
-
 import pytest
 
 from src.erasure.encoder import encode
@@ -170,7 +152,9 @@ class TestVerifierDetectsCorruption:
         assert report.fp_checked is True
         assert report.fp_matched is True
 
-    def test_tampered_parity_fingerprint_is_ignored_for_parity_index(self, encoded_block):
+    def test_tampered_parity_fingerprint_is_ignored_for_parity_index(
+        self, encoded_block
+    ):
         """Parity fragments do not consult fpcc.fingerprints during verification."""
         frags, fpcc = encoded_block
 
@@ -233,7 +217,9 @@ class TestBatchCheck:
         reports = Verifier.batch_check(pairs, fpcc)
 
         assert reports[2].result == VerificationResult.HASH_MISMATCH
-        assert all(reports[i].result == VerificationResult.CONSISTENT for i in [0, 1, 3, 4])
+        assert all(
+            reports[i].result == VerificationResult.CONSISTENT for i in [0, 1, 3, 4]
+        )
 
     def test_batch_preserves_input_order(self, encoded_block):
         """Reports are returned in the same order as the input pairs."""
@@ -452,3 +438,4 @@ class TestFalsePositiveRate:
             f"A non-zero rate indicates a bug in the verification pipeline - "
             f"Verifier.check() is rejecting fragments it should accept."
         )
+

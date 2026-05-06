@@ -1,5 +1,5 @@
 """
-decoder.py -- Reed-Solomon erasure decoding.
+decoder.py -- Systematic MDS erasure decoding over GF(2^8).
 
 Reconstructs the original data block from any m (or more) of the n encoded
 fragments using the inverse of the Cauchy sub-matrix corresponding to the
@@ -7,7 +7,7 @@ available fragment indices.
 
 Decoding steps:
     1. Select exactly m fragments (discard extras).
-    2. Extract the m×m sub-matrix of the Cauchy encoding matrix for the
+    2. Extract the m x m sub-matrix of the coding matrix for the
        chosen fragment indices.
     3. Invert the sub-matrix over GF(2^8).
     4. Multiply the inverse by the m fragment vectors to recover the m
@@ -16,8 +16,9 @@ Decoding steps:
 """
 
 from __future__ import annotations
+
 from .encoder import Fragment
-from reedsolo import RSCodec, ReedSolomonError
+from .matrix import CodingMatrix
 
 
 def decode(fragments: list[Fragment]) -> bytes:
@@ -34,9 +35,10 @@ def decode(fragments: list[Fragment]) -> bytes:
     Raises:
         ValueError: If fewer than m fragments are provided, or if the
                     fragments belong to different blocks (mismatched block_id
-                    or coding parameters).
+                    or coding parameters), or duplicate fragment indices are
+                    provided.
         DecodingError: If the selected sub-matrix is singular (should not
-                       happen for a well-formed Cauchy matrix).
+                       happen for a well-formed coding matrix).
     """
     if not fragments:
         raise ValueError("At least one fragment is required")
@@ -47,11 +49,25 @@ def decode(fragments: list[Fragment]) -> bytes:
     m = fragments[0].threshold_m
     original_length = fragments[0].original_length
 
-    for f in fragments:
-        if f.block_id != block_id or f.total_n != n or f.threshold_m != m:
+    seen_indices: set[int] = set()
+    for fragment in fragments:
+        if (
+            fragment.block_id != block_id
+            or fragment.total_n != n
+            or fragment.threshold_m != m
+        ):
             raise ValueError("Fragments have mismatched block_id or coding parameters")
-        if len(f.data) != len(fragments[0].data):
+
+        if len(fragment.data) != len(fragments[0].data):
             raise ValueError("Fragments have inconsistent data lengths")
+
+        if fragment.index < 0 or fragment.index >= n:
+            raise ValueError("Fragment index is out of range")
+
+        if fragment.index in seen_indices:
+            raise ValueError("Fragments contain duplicate indices")
+
+        seen_indices.add(fragment.index)
 
     # Check len(fragments) >= m.
     if len(fragments) < m:
@@ -60,24 +76,23 @@ def decode(fragments: list[Fragment]) -> bytes:
     # Sort fragments by index; pick the first m.
     sorted_fragments = sorted(fragments, key=lambda f: f.index)[:m]
     chunk_size = len(sorted_fragments[0].data)
+    fragment_indices = [fragment.index for fragment in sorted_fragments]
 
-    # Rebuild RSCodec same as encoder; decode each column with erasures at missing indices.
-    rsc = RSCodec(n - m)
-    fragment_indices = [f.index for f in sorted_fragments]
-    erase_pos = [i for i in range(n) if i not in fragment_indices]
+    coding_matrix = CodingMatrix(m=m, n=n)
+    try:
+        decoding_matrix = coding_matrix.submatrix(fragment_indices).invert()
+    except ValueError as error:
+        raise DecodingError("Could not invert erasure coding sub-matrix") from error
 
-    # For each byte column, build received codeword and decode to get the m-byte stripe.
     byte_chunks = [bytearray() for _ in range(m)]
-    for col in range(chunk_size):
-        received = bytearray(n)
-        for i, f in enumerate(sorted_fragments):
-            received[f.index] = f.data[col]
-        try:
-            decoded_stripe, _, _ = rsc.decode(bytes(received), erase_pos=erase_pos)
-        except ReedSolomonError as e:
-            raise DecodingError("Reed-Solomon decoding failed") from e
-        for j in range(m):
-            byte_chunks[j].append(decoded_stripe[j])
+    for byte_position in range(chunk_size):
+        received_symbols: list[int] = []
+        for fragment in sorted_fragments:
+            received_symbols.append(fragment.data[byte_position])
+
+        decoded_stripe = decoding_matrix.encode(received_symbols)
+        for chunk_index, decoded_byte in enumerate(decoded_stripe):
+            byte_chunks[chunk_index].append(decoded_byte)
 
     # Concatenate m data chunks and strip trailing zero padding using original_length.
     padded_data = b"".join(bytes(chunk) for chunk in byte_chunks)

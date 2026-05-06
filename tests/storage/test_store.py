@@ -1,17 +1,3 @@
-"""
-test_store.py -- Unit tests for the disk-backed FragmentStore.
-
-Uses a repo-local temporary directory to avoid polluting the real filesystem.
-
-Covers:
-    - put() then get() returns the same FragmentRecord
-    - has() returns False before put, True after put
-    - delete() removes the fragment; subsequent get() raises FragmentNotFoundError
-    - list_fragments() returns all stored fragments for a block, sorted by index
-    - Overwrite: two put() calls for the same (block_id, index) keep the latest
-    - put() is atomic (temp-file-then-rename pattern)
-"""
-
 from collections.abc import Iterator
 import pytest
 import shutil

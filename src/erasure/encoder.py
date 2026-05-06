@@ -1,18 +1,15 @@
 """
-encoder.py -- Reed-Solomon erasure encoding.
+encoder.py -- Systematic MDS erasure encoding over GF(2^8).
 
 Takes a raw data block and produces n equal-length byte fragments using the
-Cauchy encoding matrix.  Fragments are labelled by their index (0 to n-1) so
-that the decoder knows which rows to use for reconstruction.
+project-owned coding matrix.  Fragments are labelled by their index (0 to n-1)
+so that the decoder knows which rows to use for reconstruction.
 
 Encoding steps:
     1. Pad data to a multiple of m bytes (chunk size = ceil(len(data) / m)).
     2. Split data into m equal-length chunks.
-    3. For each byte position across chunks, apply the n×m encoding matrix.
+    3. For each byte position across chunks, apply the n x m encoding matrix.
     4. Return n fragments, each of the same byte length as one chunk.
-
-The `reedsolo` library may be used as a reference or replaced by a direct
-Cauchy-matrix implementation via the `galois` library.
 """
 
 from __future__ import annotations
@@ -20,7 +17,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-from reedsolo import ReedSolomonError, RSCodec
+from .matrix import CodingMatrix
 
 
 @dataclass
@@ -68,12 +65,12 @@ def encode(
         A list of n Fragment objects, in index order [0 .. n-1].
 
     Raises:
-        ValueError: If data is empty, or if m > n, or if n + m > 256
-                    (Cauchy matrix constraint).
+        ValueError: If data is empty, or if m > n, or if n + m > 256.
     """
-    # Validate arguments because it needs to fit within the Cauchy matrix constraints
-    if m > n or n + m > 256 or not data:
-        raise ValueError("Arguments are invalid")
+    if not data:
+        raise ValueError("data must not be empty")
+
+    coding_matrix = CodingMatrix(m=m, n=n)
 
     if not block_id:
         block_id = hashlib.sha256(data).hexdigest()
@@ -82,33 +79,32 @@ def encode(
     padded_data = _pad(data, m)
 
     # Split padded data into m equal-length byte chunks.
-    byte_chunks = []
     chunk_size = len(padded_data) // m
-
-    for i in range(0, len(padded_data), chunk_size):
-        byte_chunks.append(padded_data[i : i + chunk_size + 1])
-
-    # For each byte position, apply encoding matrix across chunks, using ReedSolomon library
-    rsc = RSCodec(n - m)
+    byte_chunks: list[bytes] = []
+    for chunk_index in range(m):
+        start = chunk_index * chunk_size
+        end = start + chunk_size
+        byte_chunks.append(padded_data[start:end])
 
     fragment_outputs = [bytearray() for _ in range(n)]
 
-    for i in range(chunk_size):
-        # Grabbing the "stripe" from each of the chunks
-        stripe = bytes([chunk[i] for chunk in byte_chunks])
-        codeword = rsc.encode(stripe)
+    for byte_position in range(chunk_size):
+        stripe: list[int] = []
+        for chunk in byte_chunks:
+            stripe.append(chunk[byte_position])
 
-        # Then distribute the n bytes to our n fragment buffers
-        for j in range(n):
-            fragment_outputs[j].append(codeword[j])
+        codeword = coding_matrix.encode(stripe)
+
+        for fragment_index, encoded_byte in enumerate(codeword):
+            fragment_outputs[fragment_index].append(encoded_byte)
 
     # Collect results into n Fragment objects.
-    fragments = []
-    for i in range(len(fragment_outputs)):
+    fragments: list[Fragment] = []
+    for fragment_index, fragment_data in enumerate(fragment_outputs):
         fragments.append(
             Fragment(
-                index=i,
-                data=bytes(fragment_outputs[i]),
+                index=fragment_index,
+                data=bytes(fragment_data),
                 block_id=block_id,
                 total_n=n,
                 threshold_m=m,

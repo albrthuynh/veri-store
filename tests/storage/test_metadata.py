@@ -1,12 +1,3 @@
-"""
-test_metadata.py -- Unit tests for ObjectMetadata serialization.
-
-Covers:
-    - to_dict() / from_dict() round-trip
-    - last_verified_at is None by default and serializes correctly
-    - mark_verified() updates last_verified_at to approximately now
-"""
-
 from datetime import datetime
 from src.storage.metadata import ObjectMetadata
 
