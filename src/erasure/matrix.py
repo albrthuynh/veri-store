@@ -21,9 +21,6 @@ from __future__ import annotations
 import numpy as np
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import galois  # type: ignore[import]
-
 from src.fingerprint.field import gf_add, gf_inv, gf_mul, gf_div
 
 

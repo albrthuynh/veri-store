@@ -12,10 +12,6 @@ Youtube Link: https://www.youtube.com/watch?v=Q5kVuM7zEUI
 
 ## Library Chosen
 
-For this project we will use the reedsolo library.
-The main reason for this is that the functions it provides makes it easy for us to 
-really focus on the system design aspect
-
 ``` python
 encode(data: bytes) -> List[bytes] (length 5),
 

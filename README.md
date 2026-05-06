@@ -13,7 +13,6 @@ This is a project made by Albert and Mac for CS588
 ## Libraries to use:
 - [hashlib](https://docs.python.org/3/library/hashlib.html) - for running hash algorithms (including SHA256) in Python
 - [cryptography](https://pypi.org/project/cryptography/) - various cryptographic primitives for Python
-- [galois](https://pypi.org/project/galois/) - finite field arithmetic
 - [numpy](https://numpy.org/) - efficient array operations for polynomial manipulation
 
 ## Project Structure
