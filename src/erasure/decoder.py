@@ -1,20 +1,3 @@
-"""
-decoder.py -- Systematic MDS erasure decoding over GF(2^8).
-
-Reconstructs the original data block from any m (or more) of the n encoded
-fragments using the inverse of the Cauchy sub-matrix corresponding to the
-available fragment indices.
-
-Decoding steps:
-    1. Select exactly m fragments (discard extras).
-    2. Extract the m x m sub-matrix of the coding matrix for the
-       chosen fragment indices.
-    3. Invert the sub-matrix over GF(2^8).
-    4. Multiply the inverse by the m fragment vectors to recover the m
-       original data chunks.
-    5. Concatenate chunks and strip padding to recover the original data.
-"""
-
 from __future__ import annotations
 
 from .encoder import Fragment
@@ -22,28 +5,10 @@ from .matrix import CodingMatrix
 
 
 def decode(fragments: list[Fragment]) -> bytes:
-    """Reconstruct the original data from a sufficient set of fragments.
-
-    Args:
-        fragments: A list of at least m Fragment objects for the same block.
-                   Extra fragments beyond m are ignored.  Fragments may be
-                   provided in any order; their .index field identifies them.
-
-    Returns:
-        The original data bytes (with padding stripped).
-
-    Raises:
-        ValueError: If fewer than m fragments are provided, or if the
-                    fragments belong to different blocks (mismatched block_id
-                    or coding parameters), or duplicate fragment indices are
-                    provided.
-        DecodingError: If the selected sub-matrix is singular (should not
-                       happen for a well-formed coding matrix).
-    """
     if not fragments:
         raise ValueError("At least one fragment is required")
 
-    # Validate that all fragments share the same block_id, n, m.
+    # All fragments must describe the same encoded block.
     block_id = fragments[0].block_id
     n = fragments[0].total_n
     m = fragments[0].threshold_m
@@ -69,11 +34,10 @@ def decode(fragments: list[Fragment]) -> bytes:
 
         seen_indices.add(fragment.index)
 
-    # Check len(fragments) >= m.
     if len(fragments) < m:
         raise ValueError(f"Need at least {m} fragments to decode, got {len(fragments)}")
 
-    # Sort fragments by index; pick the first m.
+    # Decode with exactly m fragments; extra valid fragments are not needed.
     sorted_fragments = sorted(fragments, key=lambda f: f.index)[:m]
     chunk_size = len(sorted_fragments[0].data)
     fragment_indices = [fragment.index for fragment in sorted_fragments]
@@ -94,15 +58,10 @@ def decode(fragments: list[Fragment]) -> bytes:
         for chunk_index, decoded_byte in enumerate(decoded_stripe):
             byte_chunks[chunk_index].append(decoded_byte)
 
-    # Concatenate m data chunks and strip trailing zero padding using original_length.
+    # Remove zero padding added during encoding.
     padded_data = b"".join(bytes(chunk) for chunk in byte_chunks)
     return padded_data[:original_length]
 
 
 class DecodingError(Exception):
-    """Raised when decoding fails due to an irrecoverable inconsistency.
-
-    This may indicate Byzantine corruption: two fragments with the same index
-    but different data, or a sub-matrix that unexpectedly cannot be inverted.
-    """
     pass

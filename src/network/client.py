@@ -1,27 +1,3 @@
-"""
-client.py -- HTTP client implementing the veri-store dispersal and retrieval protocols.
-
-The client is the entry point for application code (and the CLI).  It:
-
-    Dispersal  (PUT):
-        1. Erasure-encode the data into n fragments.
-        2. Generate the fingerprinted cross-checksum (fpcc).
-        3. Send each fragment to its designated server in parallel.
-        4. Confirm that at least m servers accepted without error.
-
-    Retrieval  (GET):
-        1. Request fragment i from server i for all i in [0, n).
-        2. Collect the first m successful responses.
-        3. Verify each returned fragment against the fpcc.
-        4. Decode the m fragments to recover the original data.
-
-    Deletion   (DELETE):
-        1. Send DELETE /fragments/{block_id}/{i} to all n servers.
-
-The client does *not* trust servers; it re-verifies every retrieved fragment
-before passing data to the caller.
-"""
-
 from __future__ import annotations
 
 import base64
@@ -47,13 +23,7 @@ _BACKOFF = 0.5  # Backoff time in seconds between retries
 
 @dataclass
 class ServerAddress:
-    """Address of a single veri-store server.
-
-    Attributes:
-        server_id (int): Server index (1-based, matches fragment index).
-        host (str):      Hostname or IP address.
-        port (int):      TCP port.
-    """
+    """Address of a single veri-store server."""
 
     server_id: int
     host: str = "localhost"
@@ -61,19 +31,11 @@ class ServerAddress:
 
     @property
     def base_url(self) -> str:
-        """Construct the base URL for this server."""
         return f"http://{self.host}:{self.port}"
 
 
 class VeriStoreClient:
-    """High-level client for the veri-store dispersal/retrieval protocol.
-
-    Attributes:
-        servers (list[ServerAddress]): Addresses of all n storage servers.
-        m (int): Reconstruction threshold (minimum fragments needed).
-        timeout (float): HTTP request timeout in seconds.
-        token (str): API token for authentication with servers.
-    """
+    """HTTP client for dispersal and retrieval."""
 
     def __init__(
         self,
@@ -82,14 +44,6 @@ class VeriStoreClient:
         timeout: float = 5.0,
         token: str = "",
     ) -> None:
-        """Initialise the client.
-
-        Args:
-            servers: List of server addresses (length == n).
-            m:       Reconstruction threshold (default 3).
-            timeout: Per-request HTTP timeout in seconds (default 5.0).
-            token:   API token for authentication.
-        """
         if m <= 0:
             raise ValueError("m must be >= 1")
         if len(servers) < m:
@@ -109,7 +63,6 @@ class VeriStoreClient:
         *,
         json: dict | None = None,
     ) -> httpx.Response | None:
-        """Helper method to send an HTTP request with retry logic for transient failures."""
         headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         delay = _BACKOFF
 
@@ -130,18 +83,6 @@ class VeriStoreClient:
         return None
 
     def put(self, block_id: str, data: bytes) -> str:
-        """Encode data and disperse fragments to all servers.
-
-        Args:
-            block_id: User-supplied key for this object.  Must be unique.
-            data:     Raw bytes to store.
-
-        Returns:
-            The block_id confirming successful dispersal.
-
-        Raises:
-            DispersalError: If fewer than m servers accepted the fragment.
-        """
         fragments = encode(data, n=len(self.servers), m=self.m, block_id=block_id)
         fpcc = FingerprintedCrossChecksum.generate(fragments)
         fpcc_json = fpcc.to_json()
@@ -183,19 +124,6 @@ class VeriStoreClient:
         return fragments[0].block_id
 
     def get(self, block_id: str) -> bytes:
-        """Retrieve and reconstruct the original data for a block.
-
-        Args:
-            block_id: The key supplied at PUT time.
-
-        Returns:
-            The original data bytes.
-
-        Raises:
-            RetrievalError: If fewer than m fragments can be retrieved or
-                            verified.
-        """
-
         def _get_one(server: ServerAddress, index: int) -> GetFragmentResponse | None:            
             response = self._request_with_retry(
                 "GET",
@@ -288,14 +216,6 @@ class VeriStoreClient:
             raise RetrievalError(f"Retrieval failed during decode: {exc}") from exc
 
     def delete(self, block_id: str) -> None:
-        """Request deletion of a stored block from all servers.
-
-        Sends DELETE requests to all servers; ignores 404 responses (fragment
-        may have already been deleted or never reached a server).
-
-        Args:
-            block_id: The key of the block to delete.
-        """
         def _delete_one(server: ServerAddress, index: int) -> None:
             response = self._request_with_retry(
                 "DELETE",
@@ -329,11 +249,6 @@ class VeriStoreClient:
                 future.result()
 
     def health_check(self) -> dict[int, bool]:
-        """Ping all servers and return their availability.
-
-        Returns:
-            A dict mapping server_id -> True (healthy) / False (unreachable).
-        """
         def _health_one(server: ServerAddress) -> tuple[int, bool]:
             response = self._request_with_retry(
                 "GET",
@@ -353,16 +268,6 @@ class VeriStoreClient:
         return results
 
     def _server_url(self, server: ServerAddress, block_id: str, index: int) -> str:
-        """Build the fragment endpoint URL for a given server.
-
-        Args:
-            server:   The target server.
-            block_id: Data block identifier.
-            index:    Fragment index.
-
-        Returns:
-            Full URL string, e.g. "http://localhost:5001/fragments/abc123/0".
-        """
         return f"{server.base_url}/fragments/{block_id}/{index}"
 
 

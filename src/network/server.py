@@ -1,20 +1,3 @@
-"""
-server.py -- FastAPI application for a single veri-store storage server.
-
-Each server process is started with a unique server_id (1–n) and a port number.
-It owns a FragmentStore rooted at ./data/server_{id}/ and handles:
-
-    PUT  /fragments/{block_id}/{index}  -- receive and store a fragment
-    GET  /fragments/{block_id}/{index}  -- return a stored fragment
-    DELETE /fragments/{block_id}/{index} -- remove a stored fragment
-    GET  /health                         -- liveness / readiness probe
-
-On receipt of a PUT, the server immediately verifies the fragment against the
-supplied fpcc.  If verification fails, the server still stores the fragment
-(so the client can request it for debugging) but marks it INVALID and returns
-HTTP 422.
-"""
-
 from __future__ import annotations
 
 import base64
@@ -62,23 +45,6 @@ def create_app(
     rate_limit_max_requests: int = 60,
     rate_limit_window_seconds: float = 60.0,
 ) -> FastAPI:
-    """Create and configure the FastAPI application for one server instance.
-
-    Args:
-        server_id:         This server's unique integer ID (1-based).
-        data_dir:          Root directory for fragment storage.
-        byzantine_indices: Fragment indices for which this server will return
-                           deliberately corrupted data on GET, simulating a
-                           Byzantine-faulty server.  All other behaviour
-                           (PUT, DELETE, health) is unaffected.  Defaults to
-                           the empty set (honest server).
-        token:             API token for authentication with clients.
-        rate_limit_max_requests: Maximum number of allowed requests per client within the rate limit window.
-        rate_limit_window_seconds: Length of the rate limit window in seconds.
-
-    Returns:
-        A configured FastAPI application instance.
-    """
     if not token:
         raise ValueError("API token must be provided for authentication")
 
@@ -293,21 +259,6 @@ def put_fragment(
     store: FragmentStore,
     server_id: int,
 ) -> StoreFragmentResponse:
-    """Handle PUT /fragments/{block_id}/{index}.
-
-    Decodes the fragment, verifies it against the fpcc, persists it, and
-    returns the verification outcome.
-
-    Args:
-        block_id: Data block identifier (from URL path).
-        index:    Fragment index (from URL path).
-        body:     Validated request body.
-        store:    The server's fragment store.
-        server_id: This server's ID (for logging).
-
-    Returns:
-        StoreFragmentResponse with the verification result.
-    """
     # 1. Reject duplicates before doing any I/O.
     # The store is a write-once model: re-sending the same fragment is an error rather than an idempotent update.
     # For idempotency, if a fragment has the same content -> 200 OK, if not -> 409 Conflict
@@ -447,19 +398,6 @@ def get_fragment(
     index: int,
     store: FragmentStore,
 ) -> GetFragmentResponse:
-    """Handle GET /fragments/{block_id}/{index}.
-
-    Args:
-        block_id: Data block identifier.
-        index:    Fragment index.
-        store:    The server's fragment store.
-
-    Returns:
-        GetFragmentResponse with the fragment data and metadata.
-
-    Raises:
-        HTTPException(404): If the fragment is not found.
-    """
     # Fetch the record; surface a 404 if this fragment was never stored.
     try:
         record = store.get(block_id, index)
@@ -489,19 +427,6 @@ def delete_fragment(
     index: int,
     store: FragmentStore,
 ) -> DeleteFragmentResponse:
-    """Handle DELETE /fragments/{block_id}/{index}.
-
-    Args:
-        block_id: Data block identifier.
-        index:    Fragment index.
-        store:    The server's fragment store.
-
-    Returns:
-        DeleteFragmentResponse confirming deletion.
-
-    Raises:
-        HTTPException(404): If the fragment is not found.
-    """
     try:
         store.delete(
             block_id, index
@@ -520,17 +445,6 @@ def delete_fragment(
 
 
 def get_health(store: FragmentStore, server_id: int) -> HealthResponse:
-    """Handle GET /health. Confirms the server is running and attempts a lightweight
-    check of the fragment store. Not a comprehensive health check, but sufficient
-    for Kubernetes liveness/readiness probes.
-
-    Args:
-        store:     The server's fragment store (used to count stored fragments).
-        server_id: This server's ID.
-
-    Returns:
-        HealthResponse with status and fragment count.
-    """
     status = "ok"
 
     try:
