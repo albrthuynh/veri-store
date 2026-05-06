@@ -1,20 +1,3 @@
-"""
-test_client.py -- Unit tests for VeriStoreClient.
-
-Uses unittest.mock to intercept httpx calls without real network I/O.
-
-Covers:
-    - put() disperses to all n servers and returns block_id
-    - put() raises DispersalError when fewer than m servers respond
-    - get() collects m fragments, verifies them, and decodes correctly
-    - get() raises RetrievalError when fewer than m verified fragments available
-    - get() re-verifies fragments and rejects corrupt server responses
-    - get() rejects mismatched fpcc metadata across servers
-    - get() skips malformed base64 and invalid response bodies
-    - delete() sends DELETE to all servers (ignores 404)
-    - health_check() returns True for responding servers, False for unreachable
-"""
-
 from __future__ import annotations
 
 import base64
@@ -30,7 +13,11 @@ from src.network.client import (
     ServerAddress,
     VeriStoreClient,
 )
-from src.network.protocol import GetFragmentResponse, HealthResponse, StoreFragmentResponse
+from src.network.protocol import (
+    GetFragmentResponse,
+    HealthResponse,
+    StoreFragmentResponse,
+)
 from src.verification.cross_checksum import FingerprintedCrossChecksum
 
 # ---------------------------------------------------------------------------
@@ -89,7 +76,9 @@ def _put_body(block_id: str, index: int) -> dict:
 
 
 def _health_body(server_id: int) -> dict:
-    return HealthResponse(server_id=server_id, status="ok", fragment_count=0).model_dump()
+    return HealthResponse(
+        server_id=server_id, status="ok", fragment_count=0
+    ).model_dump()
 
 
 def _fragment_url(port: int, block_id: str, index: int) -> str:
@@ -160,7 +149,9 @@ class TestClientPut:
     def test_put_calls_all_servers(self, client, servers):
         """put() sends exactly one PUT request to each of the n servers."""
         url_map = {
-            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(200, _put_body(_BLOCK_ID, i))
+            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(
+                200, _put_body(_BLOCK_ID, i)
+            )
             for i in range(_N)
         }
         mock_http = _mock_http(url_map)
@@ -173,7 +164,9 @@ class TestClientPut:
     def test_put_returns_block_id(self, client, servers):
         """put() returns the block_id string on success."""
         url_map = {
-            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(200, _put_body(_BLOCK_ID, i))
+            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(
+                200, _put_body(_BLOCK_ID, i)
+            )
             for i in range(_N)
         }
         mock_http = _mock_http(url_map)
@@ -188,11 +181,21 @@ class TestClientPut:
         # returns a 422 response immediately (< 500, no retry), but _put_one
         # treats anything other than 200 as a failure — only 2 successes total.
         url_map = {
-            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(200, _put_body(_BLOCK_ID, 0)),
-            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(200, _put_body(_BLOCK_ID, 1)),
-            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(422, {"detail": "verification failed"}),
-            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(422, {"detail": "verification failed"}),
-            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(422, {"detail": "verification failed"}),
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(
+                200, _put_body(_BLOCK_ID, 0)
+            ),
+            _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
+                200, _put_body(_BLOCK_ID, 1)
+            ),
+            _fragment_url(servers[2].port, _BLOCK_ID, 2): _http_response(
+                422, {"detail": "verification failed"}
+            ),
+            _fragment_url(servers[3].port, _BLOCK_ID, 3): _http_response(
+                422, {"detail": "verification failed"}
+            ),
+            _fragment_url(servers[4].port, _BLOCK_ID, 4): _http_response(
+                422, {"detail": "verification failed"}
+            ),
         }
         mock_http = _mock_http(url_map)
         with patch("src.network.client.httpx.Client", return_value=mock_http):
@@ -203,8 +206,10 @@ class TestClientPut:
         """put() forwards the configured bearer token on each request."""
         client = VeriStoreClient(servers=servers, m=_M, token="secret-token")
 
-        url_map ={
-            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(200, _put_body(_BLOCK_ID, i))
+        url_map = {
+            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(
+                200, _put_body(_BLOCK_ID, i)
+            )
             for i in range(_N)
         }
         mock_http = _mock_http(url_map)
@@ -277,7 +282,9 @@ class TestClientGet:
 
         assert result == _DATA
 
-    def test_get_raises_retrieval_error_when_not_enough_valid(self, client, servers, encoded):
+    def test_get_raises_retrieval_error_when_not_enough_valid(
+        self, client, servers, encoded
+    ):
         """
         get() raises RetrievalError when all servers return Byzantine fragments
         and the client cannot assemble m=3 verified fragments.
@@ -294,11 +301,15 @@ class TestClientGet:
             with pytest.raises(RetrievalError):
                 client.get(_BLOCK_ID)
 
-    def test_get_skips_mismatched_fpcc_and_still_recovers_with_m_honest(self, client, servers, encoded):
+    def test_get_skips_mismatched_fpcc_and_still_recovers_with_m_honest(
+        self, client, servers, encoded
+    ):
         """Fragments with a different fpcc_json are treated as untrusted and skipped."""
         fragments, fpcc_json = encoded
 
-        other_fragments = encode(b"different block entirely", n=_N, m=_M, block_id="other-block")
+        other_fragments = encode(
+            b"different block entirely", n=_N, m=_M, block_id="other-block"
+        )
         other_fpcc_json = FingerprintedCrossChecksum.generate(other_fragments).to_json()
 
         url_map = {
@@ -321,7 +332,9 @@ class TestClientGet:
         mock_http = _mock_http(url_map)
 
         with patch("src.network.client.httpx.Client", return_value=mock_http):
-            with patch("src.network.client.as_completed", side_effect=lambda futures: futures):
+            with patch(
+                "src.network.client.as_completed", side_effect=lambda futures: futures
+            ):
                 result = client.get(_BLOCK_ID)
 
         assert result == _DATA
@@ -332,7 +345,9 @@ class TestClientGet:
         """Retrieval fails if fewer than m responses agree on the fpcc metadata."""
         fragments, fpcc_json = encoded
 
-        other_fragments = encode(b"different block entirely", n=_N, m=_M, block_id="other-block")
+        other_fragments = encode(
+            b"different block entirely", n=_N, m=_M, block_id="other-block"
+        )
         other_fpcc_json = FingerprintedCrossChecksum.generate(other_fragments).to_json()
 
         url_map = {
@@ -355,11 +370,17 @@ class TestClientGet:
         mock_http = _mock_http(url_map)
 
         with patch("src.network.client.httpx.Client", return_value=mock_http):
-            with patch("src.network.client.as_completed", side_effect=lambda futures: futures):
-                with pytest.raises(RetrievalError, match="only 2 verified fragments available"):
+            with patch(
+                "src.network.client.as_completed", side_effect=lambda futures: futures
+            ):
+                with pytest.raises(
+                    RetrievalError, match="only 2 verified fragments available"
+                ):
                     client.get(_BLOCK_ID)
 
-    def test_get_skips_malformed_base64_and_still_recovers(self, client, servers, encoded):
+    def test_get_skips_malformed_base64_and_still_recovers(
+        self, client, servers, encoded
+    ):
         """Malformed fragment_data is ignored rather than crashing retrieval."""
         fragments, fpcc_json = encoded
 
@@ -397,7 +418,9 @@ class TestClientGet:
         invalid_body = {"block_id": _BLOCK_ID, "index": 0}  # missing required fields
 
         url_map = {
-            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(200, invalid_body),
+            _fragment_url(servers[0].port, _BLOCK_ID, 0): _http_response(
+                200, invalid_body
+            ),
             _fragment_url(servers[1].port, _BLOCK_ID, 1): _http_response(
                 200, _get_body(fragments[1], fpcc_json)
             ),
@@ -445,7 +468,9 @@ class TestClientGet:
         mock_http = _mock_http(url_map)
 
         with patch("src.network.client.httpx.Client", return_value=mock_http):
-            with patch("src.network.client.as_completed", side_effect=lambda futures: futures):
+            with patch(
+                "src.network.client.as_completed", side_effect=lambda futures: futures
+            ):
                 with pytest.raises(RetrievalError, match="invalid fpcc"):
                     client.get(_BLOCK_ID)
 
@@ -502,13 +527,17 @@ class TestClientDelete:
         with patch("src.network.client.httpx.Client", return_value=mock_http):
             client.delete(_BLOCK_ID)
 
-        delete_calls = [c for c in mock_http.request.call_args_list if c.args[0] == "DELETE"]
+        delete_calls = [
+            c for c in mock_http.request.call_args_list if c.args[0] == "DELETE"
+        ]
         assert len(delete_calls) == _N
 
     def test_delete_ignores_404(self, client, servers):
         """delete() does not raise when a server returns 404 (fragment already gone)."""
         url_map = {
-            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(404, {"detail": "not found"})
+            _fragment_url(servers[i].port, _BLOCK_ID, i): _http_response(
+                404, {"detail": "not found"}
+            )
             for i in range(_N)
         }
         mock_http = _mock_http(url_map)
@@ -530,11 +559,13 @@ class TestClientDelete:
         with patch("src.network.client.httpx.Client", return_value=mock_http):
             client.delete(_BLOCK_ID)
 
-        delete_calls = [c for c in mock_http.request.call_args_list if c.args[0] == "DELETE"]
+        delete_calls = [
+            c for c in mock_http.request.call_args_list if c.args[0] == "DELETE"
+        ]
         assert len(delete_calls) == _N
         for call in delete_calls:
             assert call.kwargs["headers"]["Authorization"] == "Bearer secret-token"
-    
+
 
 # ---------------------------------------------------------------------------
 # TestClientHealthCheck
@@ -603,6 +634,8 @@ class TestClientHealthCheck:
         assert len(result) == _N
         assert all(result.values())
 
-        health_calls = [c for c in mock_http.request.call_args_list if c.args[0] == "GET"]
+        health_calls = [
+            c for c in mock_http.request.call_args_list if c.args[0] == "GET"
+        ]
         for call in health_calls:
             assert call.kwargs["headers"] == {}

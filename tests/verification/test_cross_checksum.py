@@ -1,17 +1,3 @@
-"""
-test_cross_checksum.py -- Unit tests for FingerprintedCrossChecksum (fpcc).
-
-Covers:
-    - generate() produces n hashes and m fingerprints
-    - hashes match SHA-256 of each fragment's data
-    - fingerprints match fp(r, d_j) for j < m
-    - r in the fpcc equals RandomOracle.derive(hashes)
-    - generate() rejects empty and out-of-order fragment lists
-    - to_json() / from_json() round-trip preserves all fields
-    - digest() returns a stable hex string for the same fpcc
-    - digest() changes when the fpcc changes
-"""
-
 import hashlib
 
 import pytest
@@ -74,7 +60,9 @@ class TestFPCCGenerate:
         out_of_order = fragments.copy()
         out_of_order[0], out_of_order[1] = out_of_order[1], out_of_order[0]
 
-        with pytest.raises(ValueError, match="fragments must be in index order with no gaps"):
+        with pytest.raises(
+            ValueError, match="fragments must be in index order with no gaps"
+        ):
             FingerprintedCrossChecksum.generate(out_of_order)
 
 
@@ -120,3 +108,4 @@ class TestFPCCSerialization:
         fpcc2 = FingerprintedCrossChecksum.generate(modified_fragments)
 
         assert fpcc1.digest() != fpcc2.digest()
+

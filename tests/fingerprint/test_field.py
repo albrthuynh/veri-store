@@ -1,18 +1,3 @@
-"""
-test_field.py -- Unit tests for GF(2^8) arithmetic.
-
-Covers:
-    - Addition (XOR) commutativity and associativity
-    - Additive identity (zero element)
-    - Multiplication commutativity and associativity
-    - Distributive law: a*(b+c) == a*b + a*c
-    - Multiplicative identity (one element)
-    - Multiplicative inverse: a * a^{-1} == 1  for all a != 0
-    - Division: (a / b) * b == a
-    - Exponentiation: a^0 == 1, a^1 == a
-    - exp/log table consistency: exp[log[a]] == a for all a != 0
-"""
-
 import pytest
 from src.fingerprint.field import GF256, build_exp_log_tables
 
@@ -108,3 +93,4 @@ class TestExpLogTables:
     def test_exp_table_length(self):
         """exp_table has at least 256 entries."""
         assert len(build_exp_log_tables()[0]) >= 256
+

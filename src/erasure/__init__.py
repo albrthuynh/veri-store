@@ -1,5 +1,5 @@
 """
-erasure -- Reed-Solomon erasure coding over GF(2^8).
+erasure -- Systematic MDS erasure coding over GF(2^8).
 
 Implements the m-of-n threshold scheme: a data block B is split into n
 fragments such that any m fragments suffice to reconstruct B.
@@ -9,13 +9,13 @@ Default parameters from the project README:
     n = 5   (total fragments: n = m + 2*f where f=1 is fault tolerance)
     f = 1   (tolerated erasures / Byzantine faults)
 
-The encoding matrix is a Cauchy (or systematic Vandermonde) matrix over
-GF(2^8).  The `galois` library provides optimised GF arithmetic.
+The encoding matrix is a project-owned systematic Cauchy-derived matrix over
+GF(2^8), using the finite-field arithmetic in src.fingerprint.field.
 
 Public API:
     encode(data, n, m)  -> list of n equal-length byte fragments
     decode(fragments)   -> reconstructed data bytes
-    CodingMatrix        -> the Cauchy matrix construction (from matrix.py)
+    CodingMatrix        -> the systematic MDS matrix construction
 """
 
 from .encoder import encode

@@ -1,19 +1,3 @@
-"""
-test_security.py -- End-to-end security integration tests.
-
-These tests wire a real VeriStoreClient to five in-process FastAPI server apps.
-They exercise the full dispersal/retrieval path across the HTTP layer while
-keeping everything local and deterministic.
-
-Covers:
-    - honest 5-server round-trip succeeds
-    - retrieval succeeds with up to f=2 Byzantine servers corrupting GET responses
-    - retrieval fails closed when 3 servers are Byzantine
-    - wrong client token causes dispersal to fail
-    - delete removes data from the whole cluster
-    - health_check reports unreachable servers correctly
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -26,7 +10,12 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src.network.client import DispersalError, RetrievalError, ServerAddress, VeriStoreClient
+from src.network.client import (
+    DispersalError,
+    RetrievalError,
+    ServerAddress,
+    VeriStoreClient,
+)
 from src.network.server import create_app
 
 _TOKEN = "integration-token"
@@ -90,7 +79,11 @@ def cluster_factory():
             if server_id in unavailable_server_ids:
                 continue
 
-            byzantine_indices = frozenset({server_id - 1}) if server_id in byzantine_server_ids else frozenset()
+            byzantine_indices = (
+                frozenset({server_id - 1})
+                if server_id in byzantine_server_ids
+                else frozenset()
+            )
             app = create_app(
                 server_id=server_id,
                 data_dir=str(root),
@@ -112,7 +105,9 @@ def cluster_factory():
             shutil.rmtree(root, ignore_errors=True)
 
 
-def _make_veristore_client(servers: list[ServerAddress], *, token: str = _TOKEN) -> VeriStoreClient:
+def _make_veristore_client(
+    servers: list[ServerAddress], *, token: str = _TOKEN
+) -> VeriStoreClient:
     return VeriStoreClient(servers=servers, m=_M, token=token)
 
 
@@ -126,44 +121,64 @@ class TestSecurityIntegration:
         data = b"integration round-trip payload"
         block_id = "security-roundtrip"
 
-        with patch("src.network.client.httpx.Client", return_value=_LocalHttpxClient(clients_by_port)):
+        with patch(
+            "src.network.client.httpx.Client",
+            return_value=_LocalHttpxClient(clients_by_port),
+        ):
             stored_block_id = client.put(block_id, data)
             recovered = client.get(block_id)
 
         assert stored_block_id == block_id
         assert recovered == data
 
-    def test_retrieval_succeeds_with_two_byzantine_servers(self, cluster_factory, servers):
+    def test_retrieval_succeeds_with_two_byzantine_servers(
+        self, cluster_factory, servers
+    ):
         """The client still reconstructs the original block with f=2 Byzantine servers."""
         clients_by_port, _ = cluster_factory(byzantine_server_ids={1, 2})
         client = _make_veristore_client(servers)
         data = b"byzantine tolerance integration payload"
         block_id = "security-byzantine-2"
 
-        with patch("src.network.client.httpx.Client", return_value=_LocalHttpxClient(clients_by_port)):
+        with patch(
+            "src.network.client.httpx.Client",
+            return_value=_LocalHttpxClient(clients_by_port),
+        ):
             client.put(block_id, data)
             recovered = client.get(block_id)
 
         assert recovered == data
 
-    def test_retrieval_fails_with_three_byzantine_servers(self, cluster_factory, servers):
+    def test_retrieval_fails_with_three_byzantine_servers(
+        self, cluster_factory, servers
+    ):
         """Retrieval fails closed when more than f=2 servers are Byzantine."""
         clients_by_port, _ = cluster_factory(byzantine_server_ids={1, 2, 3})
         client = _make_veristore_client(servers)
         data = b"too many byzantine servers"
         block_id = "security-byzantine-3"
 
-        with patch("src.network.client.httpx.Client", return_value=_LocalHttpxClient(clients_by_port)):
+        with patch(
+            "src.network.client.httpx.Client",
+            return_value=_LocalHttpxClient(clients_by_port),
+        ):
             client.put(block_id, data)
-            with pytest.raises(RetrievalError, match="only .* verified fragments available"):
+            with pytest.raises(
+                RetrievalError, match="only .* verified fragments available"
+            ):
                 client.get(block_id)
 
-    def test_wrong_client_token_causes_dispersal_failure(self, cluster_factory, servers):
+    def test_wrong_client_token_causes_dispersal_failure(
+        self, cluster_factory, servers
+    ):
         """A client with the wrong bearer token cannot successfully disperse data."""
         clients_by_port, _ = cluster_factory()
         client = _make_veristore_client(servers, token="wrong-token")
 
-        with patch("src.network.client.httpx.Client", return_value=_LocalHttpxClient(clients_by_port)):
+        with patch(
+            "src.network.client.httpx.Client",
+            return_value=_LocalHttpxClient(clients_by_port),
+        ):
             with pytest.raises(DispersalError):
                 client.put("wrong-token-block", b"should not be accepted")
 
@@ -174,7 +189,10 @@ class TestSecurityIntegration:
         data = b"delete me securely"
         block_id = "security-delete"
 
-        with patch("src.network.client.httpx.Client", return_value=_LocalHttpxClient(clients_by_port)):
+        with patch(
+            "src.network.client.httpx.Client",
+            return_value=_LocalHttpxClient(clients_by_port),
+        ):
             client.put(block_id, data)
             client.delete(block_id)
             with pytest.raises(RetrievalError, match="no servers returned a fragment"):
@@ -185,7 +203,10 @@ class TestSecurityIntegration:
         clients_by_port, _ = cluster_factory(unavailable_server_ids={4, 5})
         client = _make_veristore_client(servers)
 
-        with patch("src.network.client.httpx.Client", return_value=_LocalHttpxClient(clients_by_port)):
+        with patch(
+            "src.network.client.httpx.Client",
+            return_value=_LocalHttpxClient(clients_by_port),
+        ):
             with patch("src.network.client.time.sleep"):
                 status = client.health_check()
 

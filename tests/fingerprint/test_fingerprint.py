@@ -1,20 +1,10 @@
-"""
-test_fingerprint.py -- Unit tests for the homomorphic fingerprint function.
-
-Key property to verify (Theorem 2.3):
-    fp(r, alpha*d1 XOR beta*d2) == alpha*fp(r,d1) XOR beta*fp(r,d2)
-
-Also tests:
-    - Fingerprint of empty data
-    - Fingerprint is deterministic (same input -> same output)
-    - random_point() returns values in [1, 255] (never zero)
-    - random_point() is deterministic for a given seed
-    - verify_homomorphic_property() helper returns True for valid data
-"""
-
 import pytest
 from src.fingerprint.field import GF256
-from src.fingerprint.fingerprint import fingerprint, random_point, verify_homomorphic_property
+from src.fingerprint.fingerprint import (
+    fingerprint,
+    random_point,
+    verify_homomorphic_property,
+)
 
 
 class TestFingerprint:
@@ -55,7 +45,7 @@ class TestFingerprint:
         """fp(r, alpha * d) == alpha * fp(r, d)."""
         r = GF256(7)
         alpha = GF256(13)
-        d = b"\x05\x0A\x0F\x14"
+        d = b"\x05\x0a\x0f\x14"
         scaled = bytes((alpha * GF256(b)).value for b in d)
         assert fingerprint(r, scaled) == alpha * fingerprint(r, d)
 
@@ -78,7 +68,9 @@ class TestFingerprint:
     def test_verify_homomorphic_property_raises_on_length_mismatch(self):
         """verify_homomorphic_property() raises ValueError when data lengths differ."""
         with pytest.raises(ValueError):
-            verify_homomorphic_property(GF256(1), b"\x01\x02", b"\x01", (GF256(1), GF256(1)))
+            verify_homomorphic_property(
+                GF256(1), b"\x01\x02", b"\x01", (GF256(1), GF256(1))
+            )
 
     def test_different_points_give_different_fingerprints(self):
         """Different evaluation points generally produce different fingerprints."""

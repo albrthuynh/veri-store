@@ -1,17 +1,3 @@
-"""
-test_oracle.py -- Unit tests for the RandomOracle.
-
-Covers:
-    - derive() is deterministic for the same hashes
-    - derive() returns a GF256 element in [0, 255]
-    - derive() never returns zero
-    - derive() raises ValueError for empty hash list
-    - derive() is sensitive to both hash contents and ordering
-    - hash_fragment() returns a 32-byte SHA-256 digest
-    - hash_fragment() is deterministic
-    - Different fragment data produces different hashes (probabilistic)
-"""
-
 import hashlib
 
 import pytest
@@ -25,7 +11,7 @@ class TestRandomOracleDerive:
 
     def test_deterministic(self):
         """Same fragment hashes always produce the same r."""
-        hashes = [b"\x00" * 32, b"\xFF" * 32, b"\xAB" * 32]
+        hashes = [b"\x00" * 32, b"\xff" * 32, b"\xab" * 32]
 
         r1 = RandomOracle.derive(hashes)
         r2 = RandomOracle.derive(hashes)
@@ -56,12 +42,12 @@ class TestRandomOracleDerive:
     def test_different_hashes_likely_different_r(self):
         """
         Different hash vectors should (usually) produce different r values.
-        
+
         Under the random oracle model, derive maps inputs approximately uniformly to non-zero GF(2^8) elements.
         Two distinct inputs could collide with probability 1/255.
         """
         r1 = RandomOracle.derive([b"\x00" * 32])
-        r2 = RandomOracle.derive([b"\xFF" * 32])
+        r2 = RandomOracle.derive([b"\xff" * 32])
 
         assert r1 != r2  # Not guaranteed, but very likely different
 
@@ -88,6 +74,7 @@ class TestRandomOracleDerive:
 
         assert RandomOracle.derive(hashes) == expected
 
+
 class TestHashFragment:
     """Tests for RandomOracle.hash_fragment()."""
 
@@ -100,7 +87,9 @@ class TestHashFragment:
 
     def test_deterministic(self):
         """Same data produces the same hash."""
-        assert RandomOracle.hash_fragment(b"same") == RandomOracle.hash_fragment(b"same")
+        assert RandomOracle.hash_fragment(b"same") == RandomOracle.hash_fragment(
+            b"same"
+        )
 
     def test_different_data_different_hash(self):
         """Different data should produce different hashes."""
@@ -112,3 +101,4 @@ class TestHashFragment:
         expected = hashlib.sha256(data).digest()
 
         assert RandomOracle.hash_fragment(data) == expected
+
