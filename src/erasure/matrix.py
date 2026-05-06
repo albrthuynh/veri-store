@@ -65,10 +65,16 @@ class CodingMatrix:
         # y_j = n + j for j in 1..m (column points)
         # M[i][j] = 1 / (x_i ^ y_j) in GF(2^8)
 
-        self._matrix: list[list[int]] = [
-            [gf_inv(gf_add(i, n + j)) for j in range(1, m + 1)]
-            for i in range (1, n + 1)
-        ]
+        self._matrix = []
+
+        # First m rows: identity
+        for i in range(m):
+            self._matrix.append([1 if j == i else 0 for j in range(m)])
+
+        # Last n-m rows: Cauchy parity
+        # row points: m+1 .. n, column points: 1 .. m  (all distinct, no overlap)
+        for i in range(1, n - m + 1):
+            self._matrix.append([gf_inv(gf_add(m + i, j)) for j in range(1, m + 1)])
 
     def encode(self, data_symbols: list[int]) -> list[int]:
         """Multiply the encoding matrix by a column of data symbols.
