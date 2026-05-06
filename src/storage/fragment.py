@@ -1,12 +1,3 @@
-"""
-fragment.py -- Server-side fragment record model.
-
-Extends the encoder's Fragment with fields that the storage server tracks:
-receipt timestamp, verification status, and the FPCC associated with the block.
-
-This model is what gets persisted to disk and returned in GET responses.
-"""
-
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,12 +6,6 @@ import base64
 
 
 class VerificationStatus(Enum):
-    """Lifecycle of a fragment's integrity check.
-
-    UNVERIFIED  -- Fragment has been stored but not yet checked against fpcc.
-    VALID       -- Fragment passed the most recent consistency check.
-    INVALID     -- Fragment failed verification (possible Byzantine corruption).
-    """
     UNVERIFIED = "unverified"
     VALID = "valid"
     INVALID = "invalid"
@@ -28,22 +13,6 @@ class VerificationStatus(Enum):
 
 @dataclass
 class FragmentRecord:
-    """A fragment as stored and tracked by a veri-store server.
-
-    Attributes:
-        index (int):          Fragment index in [0, total_n).
-        data (bytes):         Raw fragment bytes.
-        block_id (str):       Unique identifier for the originating data block.
-        total_n (int):        Total number of fragments in the coding scheme.
-        threshold_m (int):    Reconstruction threshold.
-        original_length (int):Byte length of the original (unpadded) data block.
-        received_at (datetime): UTC timestamp when the fragment arrived.
-        verification_status (VerificationStatus): Result of the last fpcc check.
-        fpcc_digest (str | None): Hex digest of the fpcc this fragment was
-                                   stored with, for re-verification on demand.
-        fpcc_json (str | None): The full fpcc JSON string, stored for debugging
-    """
-
     index: int
     data: bytes
     block_id: str
