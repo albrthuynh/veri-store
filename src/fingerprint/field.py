@@ -180,7 +180,6 @@ class GF256:
         """Convert to plain Python int."""
         return self.value
 
-
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
@@ -229,3 +228,31 @@ def build_exp_log_tables(
     exp_table[255] = 1
 
     return exp_table, log_table
+
+# Module-level precomputed tables for O(1) GF arithmetic
+_EXP, _LOG = build_exp_log_tables()
+
+# Fast int arithmetic
+def gf_add(a: int, b: int) -> int:
+    """Add two GF(2^8) elements (XOR)."""
+    return a ^ b
+
+def gf_mul(a: int, b: int) -> int:
+    """Multiply two GF(2^8) elements using exp/log tables."""
+    if a == 0 or b == 0:
+        return 0
+    return _EXP[(_LOG[a] + _LOG[b]) % 255]
+
+def gf_div(a: int, b: int) -> int:
+    """Divide two GF(2^8) elements: a * b^{-1}."""
+    if b == 0:
+        raise ZeroDivisionError("division by zero in GF(2^8)")
+    if a == 0:
+        return 0
+    return _EXP[(_LOG[a] - _LOG[b]) % 255]
+
+def gf_inv(a: int) -> int:
+    """Multiplicative inverse of as GF(2^8) element."""
+    if a == 0:
+        raise ZeroDivisionError("zero element has no multiplicative inverse in GF(2^8)")
+    return _INVERSE_TABLE[a]
