@@ -40,11 +40,11 @@
 \definecolor{semitrusted}{RGB}{255,165,0}
 \definecolor{untrusted}{RGB}{255,99,71}
 \tikzstyle{process}   = [circle, minimum width=1.3cm, minimum height=1.3cm,
-                          text centered, draw=black, fill=trusted!60, font=\scriptsize]
+                          text centered, align=center, draw=black, fill=trusted!60, font=\scriptsize]
 \tikzstyle{entity}    = [rectangle, minimum width=1.8cm, minimum height=0.8cm,
-                          text centered, draw=black, font=\scriptsize]
+                          text centered, align=center, draw=black, font=\scriptsize]
 \tikzstyle{datastore} = [rectangle, minimum width=2.2cm, minimum height=0.7cm,
-                          text centered, draw=black, double, font=\scriptsize]
+                          text centered, align=center, draw=black, double, font=\scriptsize]
 \tikzstyle{arrow}     = [thick,->,>=stealth]
 
 \title{\textbf{Veri-Store: A Distributed File Storage System\\
@@ -63,42 +63,27 @@
 % ============================================================
 \section{Introduction}
 
-Veri-Store is a distributed file storage system that combines \textbf{erasure coding} with
-\textbf{homomorphic fingerprint verification} to provide fault-tolerant, tamper-evident
-data storage without requiring full data replication.
+Veri-Store is a distributed file storage system that combines erasure coding with homomorphic fingerprint verification to provide fault-tolerant, tamper-evident data storage without requiring full data replication.
 
-The core problem is this: how can a client distribute a data block across multiple servers
-and, upon retrieval, be \emph{certain} that the returned data has not been tampered with,
-even if some servers are Byzantine (actively adversarial)? Simple hashing requires the
-client to store a trusted hash offline; naive replication does not detect subtle corruption.
-Veri-Store addresses this with a cryptographic primitive called the
-\emph{fingerprinted cross-checksum} (fpcc), which allows each fragment to be independently
-verified using information derived from \emph{all} fragments at upload time.
+The core problem is this: how can a client distribute a data block across multiple servers and, upon retrieval, be certain that the returned data has not been tampered with, even if some servers are actively adversarial? Simple hashing requires the client to store a trusted hash offline; naive replication does not detect subtle corruption.
+
+Veri-Store addresses this with a cryptographic primitive called the fingerprinted cross-checksum (\texttt{fpcc}), which allows each fragment to be independently verified using information derived from all fragments at upload time.
 
 \subsection*{Primary Goals}
 \begin{enumerate}
-  \item \textbf{Integrity}: Any byte-level tampering of a stored fragment is detected
-        before the fragment is used in reconstruction.
-  \item \textbf{Fault tolerance}: Up to $n - m$ servers may be unavailable or Byzantine;
-        the original block is still recoverable from the remaining $m$ honest servers.
-  \item \textbf{Authenticity}: Each fragment is verifiably bound to the block it originated
-        from; a fragment substitution from a different block is caught.
+  \item \textbf{Integrity}: Any byte-level tampering of a stored fragment is detected before the fragment is used in reconstruction.
+  \item \textbf{Fault tolerance}: Up to $n - m$ servers may be unavailable or byzantine; the original block is still recoverable from the remaining $m$ honest servers.
+  \item \textbf{Authenticity}: Each fragment is verifiably bound to the block it originated from; a fragment substitution from a different block is caught.
 \end{enumerate}
 
-Veri-Store is explicitly \emph{not} an encryption scheme. Sensitive data should be
-encrypted before submission. Availability is guaranteed only when at most 2 of 5 servers
-are lost.
+Veri-Store is explicitly \emph{not} an encryption scheme. Sensitive data should be encrypted before submission. Availability is guaranteed only when at most 2 of 5 servers are lost. (3-of-5 erasure coding, with $m = 3$ and $n = 5$.)
 
 % ============================================================
 \section{System Design}
 
 \subsection{Erasure Coding: 3-of-5 Reed-Solomon}
 
-The client encodes a data block into $n = 5$ fragments using a Cauchy-matrix-based
-Reed-Solomon scheme over $\mathrm{GF}(256)$. Any $m = 3$ of those 5 fragments suffice to
-reconstruct the original block; the remaining $n - m = 2$ are redundant. This gives
-availability even when 2 servers are unreachable or corrupt, at the cost of $5/3 \approx
-1.67\times$ storage overhead vs.\ full replication's $5\times$.
+The client encodes a data block into $n = 5$ fragments using a Cauchy-matrix-based Reed-Solomon scheme over $\mathrm{GF}(256)$. Any $m = 3$ of those 5 fragments suffice to reconstruct the original block; the remaining $n - m = 2$ are redundant. This gives availability even when 2 servers are unreachable or corrupt, at the cost of $5/3 \approx 1.67\times$ storage overhead vs.\ full replication's $5\times$.
 
 \textbf{Design choice}: A Cauchy matrix over $\mathrm{GF}(256)$ is used (implemented in
 \texttt{src/erasure/matrix.py}) rather than a Vandermonde matrix, because Cauchy matrices
@@ -110,8 +95,9 @@ correctness and eliminating degenerate parameterizations.
 For a fragment $d_i$ of length $L$ bytes, the \emph{fingerprint} at evaluation point
 $r \in \mathrm{GF}(256)$ is:
 \[
-  \mathrm{fp}(r, d_i) = \sum_{j=0}^{L-1} d_i[j] \cdot r^j \pmod{256}.
+  \mathrm{fp}(r, d_i) = \sum_{j=0}^{L-1} d_i[j] \cdot r^j, \quad r, d_i[j] \in \mathrm{GF}(256).
 \]
+
 This is a polynomial evaluation over $\mathrm{GF}(256)$ and is \emph{homomorphic}: for
 erasure-coded fragments, $\mathrm{fp}(r, d_0)$ encodes information about all other
 fragments, so consistency across fragments can be checked without reconstructing the full
@@ -214,7 +200,7 @@ src/
 
 \begin{enumerate}
   \item \texttt{client.py} issues $n$ parallel GET requests and collects the first $m$
-        successful responses using \texttt{ThreadPoolExecutor}.
+        successful responses using \texttt{Thread\-Pool\-Executor}.
   \item For each returned fragment, \texttt{Verifier.check()} runs two checks:
         (a) \texttt{SHA-256} hash against the fpcc entry, and
         (b) for $i < m$, a fingerprint check: $\mathrm{fp}(r', d_i) \stackrel{?}{=}
