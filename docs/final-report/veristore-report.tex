@@ -23,6 +23,7 @@
 \usetikzlibrary{shapes.geometric, arrows, positioning}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{multirow}
 
 % ===== Code =====
 \usepackage{listings}
@@ -85,26 +86,15 @@ Veri-Store is explicitly \emph{not} an encryption scheme. Sensitive data should 
 
 The client encodes a data block into $n = 5$ fragments using a Cauchy-matrix-based Reed-Solomon scheme over $\mathrm{GF}(256)$. Any $m = 3$ of those 5 fragments suffice to reconstruct the original block; the remaining $n - m = 2$ are redundant. This gives availability even when 2 servers are unreachable or corrupt, at the cost of $5/3 \approx 1.67\times$ storage overhead vs.\ full replication's $5\times$.
 
-\textbf{Design choice}: A Cauchy matrix over $\mathrm{GF}(256)$ is used (implemented in
-\texttt{src/erasure/matrix.py}) rather than a Vandermonde matrix, because Cauchy matrices
-are always invertible for any choice of distinct field elements, simplifying the proof of
-correctness and eliminating degenerate parameterizations.
+\textbf{Design choice}: A Cauchy matrix over $\mathrm{GF}(256)$ is used (implemented in \texttt{src/erasure/matrix.py}) rather than a Vandermonde matrix, because Cauchy matrices are always invertible for any choice of distinct field elements, simplifying the proof of correctness and eliminating degenerate parameterizations.
 
-\subsection{Homomorphic Fingerprinting and the fpcc}
+\subsection{Homomorphic Fingerprinting and the \texttt{fpcc}}
 
-For a fragment $d_i$ of length $L$ bytes, the \emph{fingerprint} at evaluation point
-$r \in \mathrm{GF}(256)$ is:
-\[
-  \mathrm{fp}(r, d_i) = \sum_{j=0}^{L-1} d_i[j] \cdot r^j, \quad r, d_i[j] \in \mathrm{GF}(256).
-\]
+For a fragment $d_i$ of length $L$ bytes, the fingerprint at evaluation point $r \in \mathrm{GF}(256)$ is: $$ \mathrm{fp}(r, d_i) = \sum_{j=0}^{L-1} d_i[j] \cdot r^j, \quad r, d_i[j] \in \mathrm{GF}(256) $$
 
-This is a polynomial evaluation over $\mathrm{GF}(256)$ and is \emph{homomorphic}: for
-erasure-coded fragments, $\mathrm{fp}(r, d_0)$ encodes information about all other
-fragments, so consistency across fragments can be checked without reconstructing the full
-block.
+This is a polynomial evaluation over $\mathrm{GF}(256)$ and is homomorphic: for erasure-coded fragments, $\mathrm{fp}(r, d_0)$ encodes information about all other fragments, so consistency across fragments can be checked without reconstructing the full block.
 
-The \textbf{fingerprinted cross-checksum} (fpcc) is generated at upload time and distributed
-to all servers alongside the fragment:
+The fingerprinted cross-checksum (\texttt{fpcc}) is generated at upload time and distributed to all servers alongside the fragment and consists of:
 \begin{itemize}
   \item $h_i = \mathrm{SHA\text{-}256}(d_i)$ for all $i \in [0, n)$.
   \item $r = \mathrm{Oracle}(h_0, \ldots, h_{n-1})$ — a deterministic challenge point
@@ -112,64 +102,77 @@ to all servers alongside the fragment:
   \item $\mathrm{fp}_i = \mathrm{fp}(r, d_i)$ for $i \in [0, m)$.
 \end{itemize}
 
-\textbf{Design choice}: The challenge point $r$ is derived from \emph{all} fragment hashes,
-not from a fixed parameter. This means $r$ changes if \emph{any} fragment changes, binding
-all fragments together cryptographically without requiring a trusted third party.
+\textbf{Design choice}: The challenge point $r$ is derived from all fragment hashes, not from a fixed parameter. This means $r$ changes if any fragment changes, binding all fragments together cryptographically without requiring a trusted third party.
 
 \subsection{Data Flow}
 
 \begin{figure}[h!]
 \centering
 \begin{tikzpicture}[node distance=1.8cm]
-  \node (client)      [entity, fill=trusted!30]      {Client};
-  \node (encode)      [process, below of=client, yshift=0.1cm] {Encode\\Block};
-  \node (fingerprint) [process, right of=encode, xshift=1.8cm] {Compute\\fpcc};
-  \node (distribute)  [process, below of=fingerprint, yshift=0.1cm] {Distribute\\Fragments};
-  \node (network)     [entity, fill=untrusted!30, right of=distribute, xshift=1.8cm] {Network};
+  \node (client)      [entity, fill=trusted!30]                                       {Client};
+  \node (encode)      [process, below of=client, yshift=0.1cm]                        {Encode\\Block};
+  \node (fingerprint) [process, right of=encode, xshift=2.2cm]                        {Compute\\\texttt{fpcc}};
+  \node (distribute)  [process, below of=fingerprint, yshift=-0.8cm]                  {Distribute\\Fragments};
+  \node (network)     [entity, fill=untrusted!30, right of=distribute, xshift=2.2cm]  {Network};
   \node (storage)     [datastore, fill=semitrusted!30, below of=network, yshift=0.1cm] {Fragment\\Storage};
-  \node (verify)      [process, below of=distribute, yshift=0.1cm] {Verify\\Fragments};
-  \node (reconstruct) [process, left of=verify, xshift=-1.8cm] {Reconstruct\\Block};
+  \node (verify)      [process, below of=distribute, yshift=-0.8cm]                   {Verify\\Fragments};
+  \node (reconstruct) [process, left of=verify, xshift=-2.2cm]                        {Reconstruct\\Block};
 
-  \draw[arrow] (client)      -- node[left,  font=\scriptsize] {1.~data}       (encode);
-  \draw[arrow] (encode)      -- node[above, font=\scriptsize] {2.~frags}      (fingerprint);
-  \draw[arrow] (fingerprint) -- node[right, font=\scriptsize] {3.~fpcc}       (distribute);
-  \draw[arrow] (distribute)  -- node[above, font=\scriptsize] {4.~PUT}        (network);
-  \draw[arrow] (network)     -- node[right, font=\scriptsize] {5.~store}      (storage);
-  \draw[arrow] (storage)     -- node[right, font=\scriptsize] {6.~retrieve}   (verify);
-  \draw[arrow] (verify)      -- node[above, font=\scriptsize] {7.~verified}   (reconstruct);
-  \draw[arrow] (reconstruct) -- node[left,  font=\scriptsize] {8.~block}      (client);
+  \draw[arrow] (client)      -- node[right,  font=\scriptsize] {1.~data}              (encode);
+  \draw[arrow] (encode)      -- node[above, font=\scriptsize] {2.~frags}             (fingerprint);
+  \draw[arrow] (fingerprint) -- node[right, font=\scriptsize] {3.~\texttt{fpcc}}     (distribute);
+  \draw[arrow] (distribute)  -- node[above, font=\scriptsize] {4.~\texttt{PUT}}      (network);
+  \draw[arrow] (network)     -- node[right, font=\scriptsize] {5.~store}             (storage);
+  \draw[arrow] (storage)     -- node[above, font=\scriptsize, xshift=-0.15cm, yshift=0.15cm] {6a.~retrieve} (verify);
+  \draw[arrow] (verify)      -- node[above, font=\scriptsize] {7.~verified}          (reconstruct);
+  \draw[arrow] (reconstruct) to[bend left=30]
+    node[left, font=\scriptsize] {8.~block}                                           (client);
   \draw[arrow,dashed] (storage) to[bend left=40]
-        node[right, font=\scriptsize] {9.~cross-check} (verify);
+    node[below, font=\scriptsize, fill=white, inner sep=1pt] {6b.~cross-check}       (verify);
 \end{tikzpicture}
 \caption{High-level data flow: green = trusted, orange = semi-trusted, red = untrusted.}
 \label{fig:dfd}
 \end{figure}
+\vspace{1.5em}
+
+\begin{description}[font=\normalfont, leftmargin=8.1em, labelwidth=7.6em, labelsep=0.5em, topsep=0pt, partopsep=0pt, parsep=0pt, itemsep=1em]
+  \item[\textbf{1. data}] The client passes the raw data block to the encoder.
+  \item[\textbf{2. frags}] The encoder produces $n$ erasure-coded fragments, passed to fingerprint computation.
+  \item[\textbf{3. \texttt{fpcc}}] The \texttt{fpcc} (per-fragment hashes and GF(256) fingerprints) is computed across all $n$ fragments.
+  \item[\textbf{4. \texttt{PUT}}] Each fragment and the shared \texttt{fpcc} are sent to their designated server.
+  \item[\textbf{5. store}] Fragment Storage receives and persists each fragment and \texttt{fpcc} to disk.
+  \item[\textbf{6a. retrieve}] On retrieval (\texttt{GET}), the server returns the stored fragment and \texttt{fpcc} together in a single response.
+  \item[\textbf{6b. cross-check}] The \texttt{fpcc} from the same response serves as the integrity reference; the verifier uses it to check each fragment before reconstruction.
+  \item[\textbf{7. verified}] Fragments that pass verification are forwarded to the reconstructor.
+  \item[\textbf{8. block}] The reconstructed original data block is returned to the client.
+\end{description}
 
 % ============================================================
 \section{Implementation}
 
 \subsection{Technology Stack}
 
-\begin{center}
-\small
-\begin{tabular}{lll}
-\hline
-\textbf{Component} & \textbf{Library} & \textbf{Purpose} \\
-\hline
-Finite field arithmetic & \texttt{numpy} $\geq$ 1.26 & GF(256) polynomial ops \\
-Erasure coding & custom (\texttt{src/erasure/}) & Cauchy-matrix RS encode/decode \\
-REST API server & \texttt{fastapi} $\geq$ 0.110, \texttt{uvicorn} & Fragment storage endpoints \\
-HTTP client & \texttt{httpx} $\geq$ 0.27 & Async parallel fragment dispersal \\
-Data validation & \texttt{pydantic} $\geq$ 2.6 & Request/response schema enforcement \\
-Testing & \texttt{pytest}, \texttt{pytest-asyncio} & Unit and integration tests \\
-\hline
-\end{tabular}
-\end{center}
+{\renewcommand{\arraystretch}{1.5}
+      \begin{center}
+      \small
+            \begin{tabular}{lll}
+                  \hline
+                  \textbf{Component} & \textbf{Library} & \textbf{Purpose} \\\hline
+                  Finite field arithmetic & \texttt{src/fingerprint/field.py} & GF(256) polynomial ops \\\hline
+                  Erasure coding & \texttt{src/erasure/} & Cauchy-matrix RS encode/decode \\\hline
+                  Fragment verification & \texttt{src/verification/} & \texttt{fpcc} generation; fragment integrity checks \\\hline
+                  Fragment persistence & \texttt{src/storage/} & On-disk fragment and metadata storage \\\hline
+                  REST API server & \texttt{fastapi} $\geq$ 0.110, \texttt{uvicorn} & Fragment storage endpoints \\\hline
+                  HTTP client & \texttt{httpx} $\geq$ 0.27 & Async parallel fragment dispersal \\\hline
+                  API schema validation & \texttt{pydantic} $\geq$ 2.6 & Request/response schema enforcement \\\hline
+                  Testing & \texttt{pytest}, \texttt{pytest-asyncio} & Unit and integration tests \\
+                  \hline
+            \end{tabular}
+      \end{center}
+}
 
 \vspace{0.3em}
-\textbf{Design choice}: \texttt{fastapi} + \texttt{pydantic} was chosen because schema
-validation happens automatically at the API boundary, rejecting malformed requests
-(e.g., impossible parameters like $m > n$) before they reach storage logic.
+\textbf{Design choice}: \texttt{fastapi} and \texttt{pydantic} were chosen because schema validation happens automatically at the API boundary, rejecting malformed requests (e.g., impossible parameters like $m > n$) before they reach storage logic.
 
 \subsection{Module Architecture}
 
@@ -182,32 +185,24 @@ src/
   storage/      store.py, fragment.py, metadata.py
 \end{lstlisting}
 
-\subsection{Key Protocol: Dispersal (PUT)}
+\subsection{Key Protocol: Dispersal (\texttt{PUT})}
 
 \begin{enumerate}
-  \item \texttt{encoder.py} pads the input to a multiple of $m$ bytes, constructs the
-        Cauchy matrix, and produces $n$ fragments as numpy arrays.
-  \item \texttt{cross\_checksum.py} computes $\{h_i\}$, derives $r$ via
-        \texttt{oracle.py}, and computes $\{\mathrm{fp}_i\}_{i<m}$ to produce the fpcc.
-  \item \texttt{client.py} fans out $n$ parallel \texttt{httpx} PUT requests, each
-        carrying the fragment (base64-encoded) and the serialized fpcc JSON.  A maximum
-        of 3 retries with 0.5 s linear backoff handles transient failures.
-  \item The server-side \texttt{server.py} immediately calls \texttt{Verifier.check()}
-        on the received fragment before persisting it to disk.
+  \item \texttt{encoder.py} pads the input to a multiple of $m$ bytes, constructs the Cauchy matrix, and produces $n$ fragments as \text{bytes} objects.
+  \item \texttt{cross\_checksum.py} computes $\{h_i\}$, derives $r$ via \texttt{oracle.py}, and computes $\{\mathrm{fp}_i\}_{i<m}$ to produce the \texttt{fpcc}.
+  \item \texttt{client.py} fans out $n$ parallel \texttt{httpx} \texttt{PUT} requests, each carrying the fragment (base64-encoded) and the serialized fpcc JSON.  A maximum of 3 retries with 0.5s linear backoff handles transient failures.
+  \item The server-side \texttt{server.py} immediately calls \texttt{Verifier.check()} on the received fragment before persisting it to disk.
 \end{enumerate}
 
-\subsection{Key Protocol: Retrieval (GET)}
-
+\subsection{Key Protocol: Retrieval (\texttt{GET})}
 \begin{enumerate}
-  \item \texttt{client.py} issues $n$ parallel GET requests and collects the first $m$
-        successful responses using \texttt{Thread\-Pool\-Executor}.
-  \item For each returned fragment, \texttt{Verifier.check()} runs two checks:
-        (a) \texttt{SHA-256} hash against the fpcc entry, and
-        (b) for $i < m$, a fingerprint check: $\mathrm{fp}(r', d_i) \stackrel{?}{=}
-            \mathrm{fpcc.fingerprints}[i]$.
-  \item Only fragments that return \texttt{CONSISTENT} are passed to
-        \texttt{decoder.py}, which inverts the Cauchy matrix to recover the original
-        block and strips padding.
+      \item \texttt{client.py} issues $n$ parallel \texttt{GET} requests and collects the first $m$ successful responses using \texttt{Thread\-Pool\-Executor}.
+      \item For each returned fragment, \texttt{Verifier.check()} runs two checks:
+            \begin{enumerate}[label=(\alph*), topsep=0pt, itemsep=0pt, parsep=0pt]
+                  \item \texttt{SHA-256} hash against the fpcc entry, and
+                  \item for $i < m$, a fingerprint check: $\mathrm{fp}(r', d_i) \stackrel{?}{=} \texttt{fpcc.fingerprints}[i]$.
+            \end{enumerate}
+      \item Only fragments that return \texttt{CONSISTENT} are passed to \texttt{decoder.py}, which inverts the Cauchy matrix to recover the original block and strips padding.
 \end{enumerate}
 
 % ============================================================
@@ -216,48 +211,45 @@ src/
 \subsection{Trust Levels}
 
 \textbf{Administrator}: Full access; assumed benign.
+
 \textbf{Authenticated Client}: Verified identity; may run buggy software.
-\textbf{Storage Server}: \emph{Semi-trusted} — may be compromised, return stale or
-corrupted fragments, or attempt to forge data.
+
+\textbf{Storage Server}: \emph{Semi-trusted} — may be compromised, return stale or corrupted fragments, or attempt to forge data.
+
 \textbf{Network}: Untrusted; adversary may observe, inject, or modify traffic.
 
-\subsection{STRIDE Threat Summary}
+% \subsection{STRIDE Threat Summary}
 
-\begin{center}
-\small
-\begin{tabular}{llp{5.5cm}l}
-\hline
-\textbf{ID} & \textbf{Category} & \textbf{Threat} & \textbf{Status} \\
-\hline
-S.1 & Spoofing   & Client impersonation via block ID        & Bearer token (partial) \\
-S.2 & Spoofing   & Server impersonation; no TLS             & Accepted (localhost) \\
-S.3 & Spoofing   & Forged fpcc from malicious server        & Requires mitigation \\
-T.1 & Tampering  & Fragment corruption in storage           & \textbf{Mitigated} \\
-T.2 & Tampering  & In-transit fragment modification         & Partially mitigated \\
-T.3 & Tampering  & Coordinated fpcc + fragment forgery      & Requires mitigation \\
-T.4 & Tampering  & Erasure code parameter manipulation      & Partially mitigated \\
-R.2 & Repudiation& Fragment deletion without audit trail    & \textbf{Mitigated} \\
-I.1 & Info.\ disc.& Fragment eavesdropping (no TLS)        & Dependency (TLS) \\
-I.4 & Info.\ disc.& Verbose error message leakage          & \textbf{Mitigated} \\
-\hline
-\end{tabular}
-\end{center}
+% \begin{center}
+% \small
+% \begin{tabular}{llp{5.5cm}l}
+% \hline
+% \textbf{ID} & \textbf{Category} & \textbf{Threat} & \textbf{Status} \\
+% \hline
+% S.1 & Spoofing   & Client impersonation via block ID        & Bearer token (partial) \\
+% S.2 & Spoofing   & Server impersonation; no TLS             & Accepted (localhost) \\
+% S.3 & Spoofing   & Forged fpcc from malicious server        & Requires mitigation \\
+% T.1 & Tampering  & Fragment corruption in storage           & \textbf{Mitigated} \\
+% T.2 & Tampering  & In-transit fragment modification         & Partially mitigated \\
+% T.3 & Tampering  & Coordinated fpcc + fragment forgery      & Requires mitigation \\
+% T.4 & Tampering  & Erasure code parameter manipulation      & Partially mitigated \\
+% R.2 & Repudiation& Fragment deletion without audit trail    & \textbf{Mitigated} \\
+% I.1 & Info.\ disc.& Fragment eavesdropping (no TLS)        & Dependency (TLS) \\
+% I.4 & Info.\ disc.& Verbose error message leakage          & \textbf{Mitigated} \\
+% \hline
+% \end{tabular}
+% \end{center}
 
 \subsection{Core Security Guarantee}
 
-Theorem 3.4 (Hendrics et al.) bounds the miss probability of the fingerprint check at
-$\leq 1/|\mathrm{GF}(256)| = 1/256$ per check.  Empirically, testing all single-byte
-flips across 100 blocks ($\times$5 fragments each) yielded a \textbf{100\% detection
-rate} and a \textbf{0.0\% false positive rate}.  The system tolerates up to $n - m = 2$
-Byzantine faults: as long as $\geq 3$ honest servers are available, the client recovers
-the original block correctly.
+\textbf{Theorem 3.4} (Hendrics et al.) bounds the miss probability of the fingerprint check at $\leq 1/|\mathrm{GF}(256)| = 1/256$ per check.  Empirically, testing all single-byte flips across 100 blocks ($\times$5 fragments each) yielded a $100\%$ detection rate and a $0.0\%$ false positive rate (\texttt{docs/experiments/theorem\_3\_4.md}).  The system tolerates up to $n - m = 2$ Byzantine faults: as long as $\geq 3$ honest servers are available, the client recovers the original block correctly.
 
 % ============================================================
 \section{System Behavior}
 
 \subsection{Expected Behavior: Honest Operation}
 
-A typical session starts 5 server processes on \texttt{localhost:5001}--\texttt{5005},
+A typical session starts 5 server processes on \texttt{localhost:5001}..\texttt{5005},
 then uses the client to store and retrieve a file:
 
 \begin{lstlisting}[language=bash]
@@ -304,7 +296,7 @@ server instances.
   \item \textbf{Unit tests}: all byte-flip mutations on test fragments detected;
         \texttt{HASH\_MISMATCH} or \texttt{FP\_MISMATCH} returned in every case.
   \item \textbf{Endpoint tests}: malformed base64, impossible parameters
-        ($m > n$), duplicate PUT, and missing bearer token all return the correct
+        ($m > n$), duplicate \texttt{PUT}, and missing bearer token all return the correct
         HTTP error codes (400, 409, 422, 401).
   \item \textbf{Integration tests}: end-to-end store/retrieve with 0, 1, and 2
         Byzantine servers; failure with 3 Byzantine servers confirmed.
