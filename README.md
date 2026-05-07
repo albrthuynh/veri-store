@@ -50,9 +50,46 @@ veri-store/
 │   ├── architecture.md       # Data flow diagrams, security model
 │   └── api.md                # REST endpoint reference
 ├── examples/
-│   ├── basic_store_retrieve.py      # End-to-end PUT → GET demo
-│   ├── fault_tolerance_demo.py      # Survive 2-server crash
-│   └── byzantine_detection_demo.py  # Detect corrupt fragment
+│   ├── reconstruct_from_2_crashes.py     # Reconstruct after 2 crashed servers
+│   ├── fail_with_3_crashes.py            # Fail closed after 3 crashed servers
+│   ├── byzantine_detection_demo.py       # Reconstruct with 1 Byzantine server
+│   └── fail_with_2_byzantine_nodes.py    # Fail closed with 2 Byzantine servers
 ├── pyproject.toml
 └── requirements.txt
 ```
+
+## Reconstruction Demos
+
+Each script starts the needed local veri-store servers automatically, runs its scenario, prints whether the expected behavior occurred, and stops the servers before exiting.
+
+- `examples/reconstruct_from_2_crashes.py`: Shows that the original object can be reconstructed when 2 of 5 servers crash.
+- `examples/fail_with_3_crashes.py`: Shows that reconstruction fails closed when 3 of 5 servers crash.
+- `examples/byzantine_detection_demo.py`: Shows that one Byzantine server returning corrupt fragment bytes is detected and the original object is still reconstructed.
+- `examples/fail_with_2_byzantine_nodes.py`: Shows that reconstruction fails closed when two Byzantine servers leave too few verified fragments.
+
+Install dependencies once before running the demos:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Run a demo with whichever Python environment you use:
+
+```bash
+# If you use a local venv directory:
+venv/bin/python examples/reconstruct_from_2_crashes.py
+
+# If your environment is already activated:
+python examples/reconstruct_from_2_crashes.py
+
+# On Windows PowerShell with a venv directory:
+.\venv\Scripts\python.exe .\examples\reconstruct_from_2_crashes.py
+
+# If you don't use a venv:
+python3 examples/reconstruct_from_2_crashes.py
+python3 examples/fail_with_3_crashes.py
+python3 examples/byzantine_detection_demo.py
+python3 examples/fail_with_2_byzantine_nodes.py
+```
+
+Replace `examples/reconstruct_from_2_crashes.py` with any of the other three demo paths to run that scenario.

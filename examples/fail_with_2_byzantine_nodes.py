@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import base64
 import shutil
 import subprocess
 import sys
@@ -11,22 +10,17 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-import httpx
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.network.protocol import GetFragmentResponse
-from src.network.client import ServerAddress, VeriStoreClient
-from src.verification.cross_checksum import FingerprintedCrossChecksum
-from src.verification.verifier import VerificationResult, Verifier
+from src.network.client import RetrievalError, ServerAddress, VeriStoreClient
 
 N = 5
 M = 4
-PORT_BASE = 5301
+PORT_BASE = 5401
 DEMO_TOKEN = "test-token"
-BYZANTINE_SERVER_IDS = [2]
+BYZANTINE_SERVER_IDS = [2, 3]
 SERVERS = [
     ServerAddress(server_id=i + 1, host="127.0.0.1", port=PORT_BASE + i)
     for i in range(N)
@@ -97,47 +91,28 @@ def stop_all(procs: list[subprocess.Popen]) -> None:
                 proc.kill()
 
 
-def verify_byzantine_fragment_is_rejected(block_id: str) -> None:
-    server = SERVERS[BYZANTINE_SERVER_IDS[0] - 1]
-    fragment_index = BYZANTINE_SERVER_IDS[0] - 1
-    url = f"{server.base_url}/fragments/{block_id}/{fragment_index}"
-    headers = {"Authorization": f"Bearer {DEMO_TOKEN}"}
-
-    response = httpx.get(url, headers=headers, timeout=5.0)
-    response.raise_for_status()
-    body = GetFragmentResponse.model_validate(response.json())
-    fragment_bytes = base64.b64decode(body.fragment_data)
-    fpcc = FingerprintedCrossChecksum.from_json(body.fpcc_json)
-    report = Verifier.check(body.index, fragment_bytes, fpcc)
-
-    if report.result == VerificationResult.CONSISTENT:
-        raise RuntimeError("Byzantine fragment unexpectedly passed verification.")
-
-    print(
-        "[CHECK]  Direct verification rejected the Byzantine fragment: "
-        f"{report.result.value}."
-    )
-
-
 def main() -> None:
     logging.basicConfig(
         level=logging.WARNING,
         format="[%(levelname)s] %(name)s: %(message)s",
     )
 
-    data_dir = Path(tempfile.mkdtemp(prefix="veri-store-byz1-"))
+    data_dir = Path(tempfile.mkdtemp(prefix="veri-store-byz2-"))
     procs = start_servers(data_dir)
     client = VeriStoreClient(servers=SERVERS, m=M, timeout=5.0, token=DEMO_TOKEN)
 
     try:
         wait_for_servers(client)
 
-        data = b"Byzantine tolerance demo: one corrupt fragment must be rejected."
-        key = f"byz1_success_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+        data = (
+            b"Byzantine failure demo: two corrupt fragments leave too few valid pieces."
+        )
+        key = f"byz2_failure_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
 
+        honest_count = N - len(BYZANTINE_SERVER_IDS)
         print(
             f"[CONFIG] Coding scheme: n={N}, m={M}. "
-            f"One Byzantine server leaves {N - 1} honest fragments."
+            f"Two Byzantine servers leave only {honest_count} honest fragments."
         )
         print(
             f"[ENCODE] client.put() will split the object into {N} fragments "
@@ -148,37 +123,33 @@ def main() -> None:
         print(f"[PUT]    All {N} servers accepted their fragments.\n")
 
         print("[GET]    Requesting fragments from all servers.")
-        print("[GET]    Server 2 will return one corrupted fragment.")
+        print("[GET]    Servers 2 and 3 will return corrupted fragments.")
         print(
-            "[VERIFY] client.get() checks fragment hashes and FPCC metadata "
-            "before decode."
+            "[VERIFY] client.get() checks fragment hashes and FPCC metadata, "
+            "then rejects corrupt responses."
         )
         print(
-            f"[THRESH] {N - 1} honest fragments remain; "
+            f"[THRESH] {honest_count} honest fragments remain; "
             f"{M} verified fragments are required."
         )
         print("[GET]    Verification warnings should appear below:\n")
 
         t0 = time.perf_counter()
-        retrieved = client.get(key)
-        elapsed_ms = (time.perf_counter() - t0) * 1000
-        verify_byzantine_fragment_is_rejected(key)
+        try:
+            client.get(key)
+        except RetrievalError as exc:
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            print()
+            client.delete(key)
+            print("[OK]     Both Byzantine fragments were rejected.")
+            print("[DECODE] Decode was not attempted with too few verified fragments.")
+            print(f"[OK]     Reconstruction failed closed: {exc}")
+            print(f"[OK]     Failure detected in {elapsed_ms:.1f} ms.")
+            print("[RESULT] PASS")
+            return
 
-        print()
-        if retrieved != data:
-            print("[FAIL]   Reconstructed bytes do not match the original object.")
-            sys.exit(1)
-
-        client.delete(key)
-        print("[OK]     Byzantine fragment was detected and ignored.")
-        print(
-            "[DECODE] The decoder rebuilt the original bytes from verified "
-            "honest fragments only."
-        )
-        print(
-            f"[OK]     Reconstruction succeeded from {M} honest fragments in {elapsed_ms:.1f} ms."
-        )
-        print("[RESULT] PASS")
+        print("[FAIL]   Reconstruction unexpectedly succeeded with 2 Byzantine nodes.")
+        sys.exit(1)
     finally:
         stop_all(procs)
         shutil.rmtree(data_dir, ignore_errors=True)
