@@ -91,5 +91,3 @@ python3 examples/fail_with_3_crashes.py
 python3 examples/byzantine_detection_demo.py
 python3 examples/fail_with_2_byzantine_nodes.py
 ```
-
-Replace `examples/reconstruct_from_2_crashes.py` with any of the other three demo paths to run that scenario.
